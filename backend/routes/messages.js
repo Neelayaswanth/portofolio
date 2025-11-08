@@ -25,7 +25,7 @@ router.post('/', async (req, res) => {
     }
 
     // Insert message into database
-    const [result] = await pool.execute(
+    const [result] = await pool.query(
       `INSERT INTO messages (name, email, subject, message) 
        VALUES (?, ?, ?, ?)`,
       [name, email, subject || 'No Subject', message]
@@ -33,7 +33,7 @@ router.post('/', async (req, res) => {
 
     // Update analytics
     const today = new Date().toISOString().split('T')[0];
-    await pool.execute(
+    await pool.query(
       `INSERT INTO analytics (date, messages_received) 
        VALUES (?, 1) 
        ON DUPLICATE KEY UPDATE 
@@ -58,7 +58,7 @@ router.post('/', async (req, res) => {
 // Get all messages (for admin dashboard)
 router.get('/', async (req, res) => {
   try {
-    const [messages] = await pool.execute(
+    const [messages] = await pool.query(
       `SELECT id, name, email, subject, message, created_at, read_status 
        FROM messages 
        ORDER BY created_at DESC`
@@ -80,7 +80,7 @@ router.get('/', async (req, res) => {
 // Get message count
 router.get('/count', async (req, res) => {
   try {
-    const [result] = await pool.execute(
+    const [result] = await pool.query(
       'SELECT COUNT(*) as total FROM messages'
     );
 
@@ -101,7 +101,7 @@ router.get('/count', async (req, res) => {
 router.patch('/:id/read', async (req, res) => {
   try {
     const { id } = req.params;
-    await pool.execute(
+    await pool.query(
       'UPDATE messages SET read_status = TRUE WHERE id = ?',
       [id]
     );
@@ -123,7 +123,7 @@ router.patch('/:id/read', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    await pool.execute(
+    await pool.query(
       'DELETE FROM messages WHERE id = ?',
       [id]
     );

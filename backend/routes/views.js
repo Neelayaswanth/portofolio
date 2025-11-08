@@ -92,7 +92,7 @@ router.post('/', async (req, res) => {
     const uniqueCheckResult = await pool.query(
       `SELECT COUNT(DISTINCT ip_address) as unique_count 
        FROM profile_views 
-       WHERE viewed_at::date = $1
+       WHERE viewed_at::date = $1`,
       [today]
     );
 

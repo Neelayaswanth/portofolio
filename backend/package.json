@@ -1,7 +1,7 @@
 {
   "name": "portfolio-backend",
   "version": "1.0.0",
-  "description": "Backend API for portfolio website - stores messages, tracks views, and manages analytics",
+  "description": "Backend API for portfolio website - stores messages, tracks views, and manages data",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -12,13 +12,13 @@
     "portfolio",
     "api",
     "express",
-    "mysql"
+    "postgresql"
   ],
   "author": "Neela Yaswanth",
   "license": "MIT",
   "dependencies": {
     "express": "^4.18.2",
-    "mysql2": "^3.6.5",
+    "pg": "^8.11.3",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1"
   },
@@ -26,4 +26,3 @@
     "nodemon": "^3.0.2"
   }
 }
-

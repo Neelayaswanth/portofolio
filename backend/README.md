@@ -11,7 +11,8 @@ Backend server for storing contact messages, tracking profile views, and managin
 
 2. **Configure environment:**
    - Create `.env` file (see `.env.example` for template)
-   - Set your MySQL database credentials
+   - Set your PostgreSQL database credentials
+   - Format: `DATABASE_URL=postgresql://username:password@host:port/database_name`
 
 3. **Start server:**
    ```bash
@@ -37,17 +38,33 @@ Backend server for storing contact messages, tracking profile views, and managin
 
 ## Database
 
-The database schema is in `database/schema.sql`. Make sure to create the database and tables before starting the server.
+The database schema is in `database/schema.sql`. 
+
+### Setting up PostgreSQL:
+
+1. **Check database connection:**
+   ```powershell
+   .\check-db.ps1
+   ```
+   This will check your PostgreSQL connection and create the database if needed.
+
+2. **Run schema manually (if needed):**
+   ```powershell
+   .\run-schema.ps1 -DatabaseName "portfolio_db" -Username "postgres"
+   ```
+
+3. **Or let the server initialize tables automatically:**
+   The server will automatically create tables on startup if they don't exist.
 
 ## Environment Variables
 
 Required in `.env` file:
-- `DB_HOST` - Database host (default: localhost)
-- `DB_USER` - Database user (default: root)
-- `DB_PASSWORD` - Database password
-- `DB_NAME` - Database name (default: portfolio_db)
+- `DATABASE_URL` - PostgreSQL connection string
+  - Format: `postgresql://username:password@host:port/database_name`
+  - Example: `postgresql://postgres:mypassword@localhost:5432/portfolio_db`
 - `PORT` - Server port (default: 3000)
-- `FRONTEND_URL` - Frontend URL for CORS
+- `FRONTEND_URL` - Frontend URL for CORS (optional)
+- `NODE_ENV` - Environment mode: `development` or `production` (optional)
 
 ## Project Structure
 

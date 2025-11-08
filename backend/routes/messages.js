@@ -25,9 +25,10 @@ router.post('/', async (req, res) => {
     }
 
     // Insert message into database
-    const [result] = await pool.query(
+    const result = await pool.query(
       `INSERT INTO messages (name, email, subject, message) 
-       VALUES (?, ?, ?, ?)`,
+       VALUES ($1, $2, $3, $4)
+       RETURNING id`,
       [name, email, subject || 'No Subject', message]
     );
 
@@ -35,16 +36,16 @@ router.post('/', async (req, res) => {
     const today = new Date().toISOString().split('T')[0];
     await pool.query(
       `INSERT INTO analytics (date, messages_received) 
-       VALUES (?, 1) 
-       ON DUPLICATE KEY UPDATE 
-       messages_received = messages_received + 1`,
+       VALUES ($1, 1) 
+       ON CONFLICT (date) DO UPDATE SET 
+       messages_received = analytics.messages_received + 1`,
       [today]
     );
 
     res.json({
       success: true,
       message: 'Message sent successfully',
-      id: result.insertId
+      id: result.rows[0].id
     });
   } catch (error) {
     console.error('Error storing message:', error);
@@ -58,7 +59,7 @@ router.post('/', async (req, res) => {
 // Get all messages (for admin dashboard)
 router.get('/', async (req, res) => {
   try {
-    const [messages] = await pool.query(
+    const result = await pool.query(
       `SELECT id, name, email, subject, message, created_at, read_status 
        FROM messages 
        ORDER BY created_at DESC`
@@ -66,7 +67,7 @@ router.get('/', async (req, res) => {
 
     res.json({
       success: true,
-      messages
+      messages: result.rows
     });
   } catch (error) {
     console.error('Error fetching messages:', error);
@@ -80,13 +81,13 @@ router.get('/', async (req, res) => {
 // Get message count
 router.get('/count', async (req, res) => {
   try {
-    const [result] = await pool.query(
+    const result = await pool.query(
       'SELECT COUNT(*) as total FROM messages'
     );
 
     res.json({
       success: true,
-      count: result[0].total
+      count: parseInt(result.rows[0].total)
     });
   } catch (error) {
     console.error('Error fetching message count:', error);
@@ -102,7 +103,7 @@ router.patch('/:id/read', async (req, res) => {
   try {
     const { id } = req.params;
     await pool.query(
-      'UPDATE messages SET read_status = TRUE WHERE id = ?',
+      'UPDATE messages SET read_status = TRUE WHERE id = $1',
       [id]
     );
 
@@ -124,7 +125,7 @@ router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     await pool.query(
-      'DELETE FROM messages WHERE id = ?',
+      'DELETE FROM messages WHERE id = $1',
       [id]
     );
 

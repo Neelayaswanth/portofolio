@@ -6,15 +6,25 @@
 // API Configuration - Auto-detect based on current origin
 const getApiBaseUrl = () => {
   const currentOrigin = window.location.origin;
-  // If running on 127.0.0.1, use 127.0.0.1 for API too
+  
+  // Production - use the same origin for API (assuming API is on same domain)
+  if (currentOrigin.includes('yaswanthneela.me') || currentOrigin.includes('github.io') || currentOrigin.includes('netlify.app') || currentOrigin.includes('vercel.app')) {
+    // For production, the API should be on the same domain or a subdomain
+    // Update this to match your production API URL
+    return 'https://your-api-domain.com/api'; // TODO: Update with your production API URL
+  }
+  
+  // Development - use localhost
   if (currentOrigin.includes('127.0.0.1')) {
     return 'http://127.0.0.1:3000/api';
   }
-  // Otherwise use localhost
+  
+  // Default to localhost
   return 'http://localhost:3000/api';
 };
 
 const API_BASE_URL = getApiBaseUrl();
+console.log('API Base URL:', API_BASE_URL);
 
 // Generate or retrieve session ID
 function getSessionId() {
@@ -32,6 +42,8 @@ async function trackProfileView() {
     const sessionId = getSessionId();
     const referrer = document.referrer || 'direct';
     
+    console.log('Tracking profile view...', { sessionId: sessionId.substring(0, 20), referrer, apiUrl: `${API_BASE_URL}/views` });
+    
     const response = await fetch(`${API_BASE_URL}/views`, {
       method: 'POST',
       headers: {
@@ -43,15 +55,23 @@ async function trackProfileView() {
       })
     });
 
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Profile view tracking failed:', response.status, errorText);
+      return;
+    }
+
     const data = await response.json();
     if (data.success) {
-      console.log('Profile view tracked');
+      console.log('✓ Profile view tracked successfully', data);
       // Optionally update view count display
       updateViewCount();
+    } else {
+      console.error('Profile view tracking failed:', data.message);
     }
   } catch (error) {
     console.error('Error tracking profile view:', error);
-    // Silently fail - don't interrupt user experience
+    // Log but don't interrupt user experience
   }
 }
 

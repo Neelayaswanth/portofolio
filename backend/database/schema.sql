@@ -20,6 +20,8 @@ CREATE TABLE IF NOT EXISTS profile_views (
     id SERIAL PRIMARY KEY,
     ip_address VARCHAR(45),
     user_agent TEXT,
+    referrer TEXT,
+    session_id VARCHAR(255),
     viewed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

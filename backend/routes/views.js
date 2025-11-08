@@ -46,10 +46,10 @@ router.post('/', async (req, res) => {
     // Update analytics
     const today = new Date().toISOString().split('T')[0];
     await pool.query(
-      `INSERT INTO analytics (date, total_views) 
-       VALUES (?, 1) 
-       ON DUPLICATE KEY UPDATE 
-       total_views = total_views + 1`,
+      ``INSERT INTO analytics (date, total_views)
+      VALUES ($1, 1)
+      ON CONFLICT (date) DO UPDATE SET
+      total_views = analytics.total_views + 1`,
       [today]
     );
 

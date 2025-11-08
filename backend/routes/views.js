@@ -11,21 +11,21 @@ router.post('/', async (req, res) => {
     const sessionId = req.body.session_id || req.sessionID || 'unknown';
 
     // Insert profile view
-    await pool.execute(
+    await pool.query(
       `INSERT INTO profile_views (ip_address, user_agent, referrer, session_id) 
        VALUES (?, ?, ?, ?)`,
       [ipAddress, userAgent, referrer, sessionId]
     );
 
     // Update or insert visitor
-    const [visitor] = await pool.execute(
+    const [visitor] = await pool.query(
       `SELECT id, visit_count FROM visitors WHERE ip_address = ?`,
       [ipAddress]
     );
 
     if (visitor.length > 0) {
       // Update existing visitor
-      await pool.execute(
+      await pool.query(
         `UPDATE visitors 
          SET visit_count = visit_count + 1, 
              last_visit = CURRENT_TIMESTAMP,
@@ -36,7 +36,7 @@ router.post('/', async (req, res) => {
       );
     } else {
       // Insert new visitor
-      await pool.execute(
+      await pool.query(
         `INSERT INTO visitors (ip_address, user_agent, referrer) 
          VALUES (?, ?, ?)`,
         [ipAddress, userAgent, referrer]
@@ -45,7 +45,7 @@ router.post('/', async (req, res) => {
 
     // Update analytics
     const today = new Date().toISOString().split('T')[0];
-    await pool.execute(
+    await pool.query(
       `INSERT INTO analytics (date, total_views) 
        VALUES (?, 1) 
        ON DUPLICATE KEY UPDATE 
@@ -54,7 +54,7 @@ router.post('/', async (req, res) => {
     );
 
     // Check if unique visitor for today
-    const [uniqueCheck] = await pool.execute(
+    const [uniqueCheck] = await pool.query(
       `SELECT COUNT(DISTINCT ip_address) as unique_count 
        FROM profile_views 
        WHERE DATE(viewed_at) = ?`,
@@ -62,7 +62,7 @@ router.post('/', async (req, res) => {
     );
 
     if (uniqueCheck[0].unique_count > 0) {
-      await pool.execute(
+      await pool.query(
         `UPDATE analytics 
          SET unique_visitors = ? 
          WHERE date = ?`,
@@ -86,7 +86,7 @@ router.post('/', async (req, res) => {
 // Get total views count
 router.get('/count', async (req, res) => {
   try {
-    const [result] = await pool.execute(
+    const [result] = await pool.query(
       'SELECT COUNT(*) as total FROM profile_views'
     );
 
@@ -106,7 +106,7 @@ router.get('/count', async (req, res) => {
 // Get unique visitors count
 router.get('/visitors/count', async (req, res) => {
   try {
-    const [result] = await pool.execute(
+    const [result] = await pool.query(
       'SELECT COUNT(*) as total FROM visitors'
     );
 
@@ -128,7 +128,7 @@ router.get('/analytics', async (req, res) => {
   try {
     const { days = 30 } = req.query;
     
-    const [analytics] = await pool.execute(
+    const [analytics] = await pool.query(
       `SELECT date, total_views, unique_visitors, messages_received 
        FROM analytics 
        WHERE date >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
@@ -137,13 +137,13 @@ router.get('/analytics', async (req, res) => {
     );
 
     // Get total stats
-    const [totalViews] = await pool.execute(
+    const [totalViews] = await pool.query(
       'SELECT COUNT(*) as total FROM profile_views'
     );
-    const [uniqueVisitors] = await pool.execute(
+    const [uniqueVisitors] = await pool.query(
       'SELECT COUNT(*) as total FROM visitors'
     );
-    const [totalMessages] = await pool.execute(
+    const [totalMessages] = await pool.query(
       'SELECT COUNT(*) as total FROM messages'
     );
 

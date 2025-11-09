@@ -1,6 +1,6 @@
 /**
  * Page Preloader Animation
- * Ball falls and bounces to 4 positions, revealing YASH letters
+ * Realistic ball bouncing with physics, revealing YASH in a straight line
  */
 
 (function() {
@@ -10,7 +10,10 @@
   const preloaderHTML = `
     <div id="page-preloader" class="page-preloader">
       <div class="preloader-content">
-        <div class="ball" id="ball"></div>
+        <div class="ball" id="ball">
+          <div class="ball-highlight"></div>
+          <div class="ball-shadow"></div>
+        </div>
         <div class="name-text" id="nameText">
           <span class="letter" data-position="1">Y</span>
           <span class="letter" data-position="2">a</span>
@@ -33,109 +36,150 @@
   // Hide main content initially
   mainContent.style.overflow = 'hidden';
 
-  // Get viewport dimensions
-  const getViewportCenter = () => ({
-    x: window.innerWidth / 2,
-    y: window.innerHeight / 2
-  });
-
-  // Calculate 4 positions around the center
-  const getPositions = () => {
-    const center = getViewportCenter();
-    const radius = Math.min(window.innerWidth, window.innerHeight) * 0.25;
+  // Realistic bounce physics
+  function bounceBall(startX, startY, targetX, targetY, bounceCount, onComplete) {
+    const gravity = 0.5;
+    const bounceDecay = 0.7; // Energy loss per bounce
+    let currentX = startX;
+    let currentY = startY;
+    let velocityX = (targetX - startX) * 0.1;
+    let velocityY = 0;
+    let bounces = 0;
+    let lastBounceY = startY;
     
-    return [
-      { x: center.x - radius, y: center.y - radius }, // Top-left
-      { x: center.x + radius, y: center.y - radius }, // Top-right
-      { x: center.x - radius, y: center.y + radius }, // Bottom-left
-      { x: center.x + radius, y: center.y + radius }  // Bottom-right
-    ];
-  };
+    const animate = () => {
+      // Apply gravity
+      velocityY += gravity;
+      
+      // Update position
+      currentX += velocityX;
+      currentY += velocityY;
+      
+      // Ground collision (bottom of screen)
+      const groundY = window.innerHeight - 50;
+      if (currentY >= groundY) {
+        currentY = groundY;
+        velocityY *= -bounceDecay; // Bounce with energy loss
+        velocityX *= 0.95; // Slight friction
+        bounces++;
+        
+        // Scale ball on bounce
+        ball.style.transform = `translate(-50%, -50%) scale(0.9)`;
+        setTimeout(() => {
+          ball.style.transform = `translate(-50%, -50%) scale(1)`;
+        }, 100);
+        
+        // Check if we should stop bouncing
+        if (bounces >= bounceCount || Math.abs(velocityY) < 0.5) {
+          currentY = groundY;
+          velocityY = 0;
+          if (onComplete) onComplete();
+          return;
+        }
+      }
+      
+      // Update ball position
+      ball.style.left = currentX + 'px';
+      ball.style.top = currentY + 'px';
+      
+      // Continue animation
+      if (bounces < bounceCount && Math.abs(velocityY) > 0.1) {
+        requestAnimationFrame(animate);
+      } else if (onComplete) {
+        onComplete();
+      }
+    };
+    
+    animate();
+  }
 
   // Animation timeline
   function startAnimation() {
-    const positions = getPositions();
-    const center = getViewportCenter();
+    const centerX = window.innerWidth / 2;
+    const startY = -50;
+    const groundY = window.innerHeight - 50;
     
-    // Phase 1: Ball falls from top to center (0.8s)
-    ball.style.left = center.x + 'px';
-    ball.style.top = '-50px';
+    // Phase 1: Ball falls from top with realistic physics
+    ball.style.left = centerX + 'px';
+    ball.style.top = startY + 'px';
     ball.style.opacity = '1';
     ball.style.transform = 'translate(-50%, -50%) scale(1)';
     
+    // Initial fall and bounce
     setTimeout(() => {
-      ball.style.top = center.y + 'px';
-      ball.style.transition = 'top 0.8s cubic-bezier(0.68, -0.55, 0.265, 1.55)';
-      
-      // Bounce effect when landing
-      setTimeout(() => {
-        ball.style.transform = 'translate(-50%, -50%) scale(1.2)';
-        setTimeout(() => {
-          ball.style.transform = 'translate(-50%, -50%) scale(1)';
-        }, 150);
-      }, 800);
-    }, 100);
-    
-    // Phase 2: Ball jumps to 4 positions, revealing letters
-    setTimeout(() => {
-      positions.forEach((pos, index) => {
-        setTimeout(() => {
-          // Move ball to position
-          ball.style.left = pos.x + 'px';
-          ball.style.top = pos.y + 'px';
-          ball.style.transition = 'all 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55)';
-          
-          // Bounce effect
-          setTimeout(() => {
-            ball.style.transform = 'translate(-50%, -50%) scale(1.3)';
+      bounceBall(centerX, startY, centerX, groundY, 3, () => {
+        // After initial bounce, move to positions
+        const positions = [
+          centerX - 150, // Y position
+          centerX - 50,  // a position
+          centerX + 50,  // s position
+          centerX + 150  // h position
+        ];
+        
+        let currentPos = centerX;
+        let letterIndex = 0;
+        
+        // Move ball to each position and reveal letter
+        function moveToNextPosition() {
+          if (letterIndex >= positions.length) {
+            // All letters revealed, fade out
             setTimeout(() => {
-              ball.style.transform = 'translate(-50%, -50%) scale(1)';
-            }, 200);
-          }, 100);
+              ball.style.opacity = '0';
+              ball.style.transition = 'opacity 0.5s ease-out';
+              
+              setTimeout(() => {
+                letters.forEach((letter, index) => {
+                  setTimeout(() => {
+                    letter.style.opacity = '0';
+                  }, index * 100);
+                });
+                
+                setTimeout(() => {
+                  preloader.style.opacity = '0';
+                  preloader.style.transition = 'opacity 1s ease-out';
+                  
+                  setTimeout(() => {
+                    preloader.style.display = 'none';
+                    mainContent.style.overflow = '';
+                    
+                    if (typeof AOS !== 'undefined') {
+                      AOS.init();
+                    }
+                  }, 1000);
+                }, 800);
+              }, 200);
+            }, 500);
+            return;
+          }
           
-          // Reveal letter after ball reaches position
-          setTimeout(() => {
-            const letter = letters[index];
+          const targetX = positions[letterIndex];
+          
+          // Bounce to next position
+          bounceBall(currentPos, groundY, targetX, groundY, 2, () => {
+            // Reveal letter when ball reaches position
+            const letter = letters[letterIndex];
             letter.style.opacity = '1';
-            letter.style.transform = 'scale(1)';
-            letter.style.left = pos.x + 'px';
-            letter.style.top = pos.y + 'px';
-          }, 400);
-        }, index * 600);
-      });
-      
-      // Phase 3: Fade out and reveal portfolio
-      setTimeout(() => {
-        // Fade out ball
-        ball.style.opacity = '0';
-        ball.style.transition = 'opacity 0.5s ease-out';
-        
-        // Fade out letters
-        setTimeout(() => {
-          letters.forEach((letter, index) => {
-            setTimeout(() => {
-              letter.style.opacity = '0';
-            }, index * 100);
-          });
-        }, 200);
-        
-        // Fade out preloader
-        setTimeout(() => {
-          preloader.style.opacity = '0';
-          preloader.style.transition = 'opacity 1s ease-out';
-          
-          setTimeout(() => {
-            preloader.style.display = 'none';
-            mainContent.style.overflow = '';
+            letter.style.transform = 'translate(-50%, -50%) scale(1)';
             
-            // Trigger AOS animations
-            if (typeof AOS !== 'undefined') {
-              AOS.init();
-            }
-          }, 1000);
-        }, 800);
-      }, 2400 + 600); // Wait for all 4 jumps + delay
-    }, 1200); // Wait for initial fall + bounce
+            // Small bounce effect on letter
+            setTimeout(() => {
+              letter.style.transform = 'translate(-50%, -50%) scale(1.2)';
+              setTimeout(() => {
+                letter.style.transform = 'translate(-50%, -50%) scale(1)';
+              }, 150);
+            }, 100);
+            
+            currentPos = targetX;
+            letterIndex++;
+            
+            // Move to next position
+            setTimeout(moveToNextPosition, 300);
+          });
+        }
+        
+        moveToNextPosition();
+      });
+    }, 100);
   }
 
   // Start animation

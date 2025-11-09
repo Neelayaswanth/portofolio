@@ -2578,10 +2578,11 @@ section,
 
 .custom-cursor.text-cursor {
   width: 2px;
-  height: 20px;
+  min-height: 16px;
   background-color: #ff922b;
   border-radius: 1px;
   animation: textCursorBlink 1s infinite;
+  transition: height 0.2s ease;
 }
 
 @keyframes textCursorBlink {

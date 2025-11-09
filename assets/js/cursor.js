@@ -159,40 +159,53 @@
       const rect = hoverableElement.getBoundingClientRect();
       const isText = isTextElement(hoverableElement);
       
-      // Different padding for text vs interactive elements
-      const padding = isText ? 8 : 12;
-      
-      // Calculate target size and position
-      targetWidth = rect.width + (padding * 2);
-      targetHeight = rect.height + (padding * 2);
-      targetX = rect.left + (rect.width / 2);
-      targetY = rect.top + (rect.height / 2);
-      
-      // Change to orange border when hovering
-      cursorFollower.style.borderColor = hoverColor;
-      
-      // Add hover class and text class if it's text
-      cursor.classList.add('hover');
-      cursorFollower.classList.add('hover');
       if (isText) {
+        // For text elements: show I-beam cursor with font-size matching
+        const computedStyle = window.getComputedStyle(hoverableElement);
+        const fontSize = parseFloat(computedStyle.fontSize);
+        const lineHeight = parseFloat(computedStyle.lineHeight) || fontSize * 1.2;
+        
+        // Calculate cursor height based on font size (slightly larger than font)
+        const cursorHeight = Math.max(fontSize * 1.2, 16);
+        
         cursorFollower.classList.add('text-hover');
         cursor.classList.add('text-cursor');
         // Hide follower, show text cursor
         cursorFollower.style.opacity = '0';
         cursor.style.width = '2px';
-        cursor.style.height = '20px';
+        cursor.style.height = cursorHeight + 'px';
         cursor.style.borderRadius = '1px';
         cursor.style.backgroundColor = hoverColor;
+        cursor.style.transform = 'translate(-50%, -50%)';
       } else {
-        cursorFollower.classList.remove('text-hover');
-        cursor.classList.remove('text-cursor');
+        // For interactive elements: form a box around the element
+        const padding = 12;
+        
+        // Calculate target size and position
+        targetWidth = rect.width + (padding * 2);
+        targetHeight = rect.height + (padding * 2);
+        targetX = rect.left + (rect.width / 2);
+        targetY = rect.top + (rect.height / 2);
+        
+        // Change to orange border when hovering
+        cursorFollower.style.borderColor = hoverColor;
         cursorFollower.style.opacity = '1';
+        
+        // Reset cursor to normal dot
+        cursor.classList.remove('text-cursor');
         cursor.style.width = '8px';
         cursor.style.height = '8px';
         cursor.style.borderRadius = '50%';
         cursor.style.backgroundColor = defaultColor;
+        cursor.style.transform = 'translate(-50%, -50%)';
+        
+        cursorFollower.classList.remove('text-hover');
+        cursorFollower.setAttribute('data-filling', 'true');
       }
-      cursorFollower.setAttribute('data-filling', 'true');
+      
+      // Add hover class
+      cursor.classList.add('hover');
+      cursorFollower.classList.add('hover');
     }
   });
 

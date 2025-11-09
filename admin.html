@@ -138,20 +138,20 @@
 
   <!-- Dashboard Container -->
   <div id="dashboard-container">
-    <div class="container">
-      <h1 class="mb-4">Portfolio Analytics Dashboard</h1>
+  <div class="container">
+    <h1 class="mb-4">Portfolio Analytics Dashboard</h1>
       
       <button class="btn btn-secondary logout-btn" onclick="logout()">
         <i class="bi bi-box-arrow-right"></i> Logout
       </button>
-      
-      <div class="alert alert-info" id="connection-status" style="display: none;">
-        <i class="bi bi-info-circle"></i> <span id="status-message"></span>
-      </div>
-      
-      <button class="btn btn-primary refresh-btn" onclick="loadAnalytics()">
-        <i class="bi bi-arrow-clockwise"></i> Refresh Data
-      </button>
+    
+    <div class="alert alert-info" id="connection-status" style="display: none;">
+      <i class="bi bi-info-circle"></i> <span id="status-message"></span>
+    </div>
+    
+    <button class="btn btn-primary refresh-btn" onclick="loadAnalytics()">
+      <i class="bi bi-arrow-clockwise"></i> Refresh Data
+    </button>
 
       <div class="row mb-4">
         <div class="col-md-12">
@@ -169,30 +169,30 @@
         </div>
       </div>
 
-      <div class="row" id="stats-container">
-        <div class="col-md-4">
-          <div class="stat-card">
-            <div class="stat-number" id="total-views">-</div>
-            <div class="stat-label">Total Profile Views</div>
-          </div>
-        </div>
-        <div class="col-md-4">
-          <div class="stat-card">
-            <div class="stat-number" id="unique-visitors">-</div>
-            <div class="stat-label">Unique Visitors</div>
-          </div>
-        </div>
-        <div class="col-md-4">
-          <div class="stat-card">
-            <div class="stat-number" id="total-messages">-</div>
-            <div class="stat-label">Messages Received</div>
-          </div>
+    <div class="row" id="stats-container">
+      <div class="col-md-4">
+        <div class="stat-card">
+          <div class="stat-number" id="total-views">-</div>
+          <div class="stat-label">Total Profile Views</div>
         </div>
       </div>
+      <div class="col-md-4">
+        <div class="stat-card">
+          <div class="stat-number" id="unique-visitors">-</div>
+          <div class="stat-label">Unique Visitors</div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="stat-card">
+          <div class="stat-number" id="total-messages">-</div>
+          <div class="stat-label">Messages Received</div>
+        </div>
+      </div>
+    </div>
 
-      <div class="row mt-4">
-        <div class="col-md-12">
-          <div class="stat-card">
+    <div class="row mt-4">
+      <div class="col-md-12">
+        <div class="stat-card">
             <div class="d-flex justify-content-between align-items-center mb-3">
               <h3 class="mb-0"><i class="bi bi-people"></i> Recent Visitor Activity</h3>
               <button class="btn btn-sm btn-outline-light" id="visitors-view-more-btn" onclick="toggleVisitorsView()" style="display: none;">
@@ -260,31 +260,31 @@
                 <i class="bi bi-chevron-down" id="messages-view-more-icon"></i> View More
               </button>
             </div>
-            <div class="table-responsive">
-              <table class="table table-dark table-hover">
-                <thead>
-                  <tr>
-                    <th>ID</th>
-                    <th>Name</th>
-                    <th>Email</th>
-                    <th>Subject</th>
-                    <th>Message</th>
-                    <th>Date</th>
-                    <th>Status</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody id="messages-table">
-                  <tr>
-                    <td colspan="8" class="text-center">Loading...</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
+          <div class="table-responsive">
+            <table class="table table-dark table-hover">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Name</th>
+                  <th>Email</th>
+                  <th>Subject</th>
+                  <th>Message</th>
+                  <th>Date</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="messages-table">
+                <tr>
+                  <td colspan="8" class="text-center">Loading...</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
     </div>
+  </div>
   </div>
 
   <!-- Supabase Client Library -->
@@ -333,9 +333,12 @@
     function updateAdminLoginTimes() {
       // Get current login time from sessionStorage (this session's login)
       const currentLoginTime = sessionStorage.getItem('adminLoginTime');
+      let currentLoginTimestamp = 0;
       if (currentLoginTime) {
-        const currentLoginDate = new Date(parseInt(currentLoginTime));
+        currentLoginTimestamp = parseInt(currentLoginTime);
+        const currentLoginDate = new Date(currentLoginTimestamp);
         document.getElementById('current-login-time').textContent = currentLoginDate.toLocaleString();
+        console.log('Current login time:', currentLoginDate.toLocaleString());
       } else {
         document.getElementById('current-login-time').textContent = 'Just now';
       }
@@ -343,11 +346,15 @@
       // Get last login time from localStorage
       // This should be set from a PREVIOUS login session
       const lastLoginISO = localStorage.getItem('adminLastLogin');
-      const currentLoginTimestamp = currentLoginTime ? parseInt(currentLoginTime) : 0;
+      console.log('Last login ISO from localStorage:', lastLoginISO);
       
       if (lastLoginISO) {
         const lastLoginDate = new Date(lastLoginISO);
         const lastLoginTimestamp = lastLoginDate.getTime();
+        
+        console.log('Last login timestamp:', lastLoginTimestamp);
+        console.log('Current login timestamp:', currentLoginTimestamp);
+        console.log('Time difference (ms):', Math.abs(lastLoginTimestamp - currentLoginTimestamp));
         
         // Ensure last login is different from current login
         // They must be at least 2 seconds apart (to account for timing issues)
@@ -356,6 +363,7 @@
         if (timeDifference > 2000) {
           // Last login is different from current - display it
           document.getElementById('last-login-time').textContent = lastLoginDate.toLocaleString();
+          console.log('Displaying last login:', lastLoginDate.toLocaleString());
         } else {
           // Times are too close - likely same login, check history
           const loginHistory = JSON.parse(localStorage.getItem('adminLoginHistory') || '[]');
@@ -437,18 +445,22 @@
         sessionStorage.setItem('adminLoginTime', newLoginTimestamp.toString());
         
         // STEP 4: Update last login information
-        // If there was a previous login, we already have it stored
-        // If this is the first login, previousLoginTimestamp will be null
+        // If there was a previous login, save it as "last login" for display
         if (previousLoginTimestamp) {
-          // Convert timestamp to ISO string for storage
+          // Convert timestamp to ISO string for storage and display
           const previousLoginDate = new Date(parseInt(previousLoginTimestamp));
           localStorage.setItem('adminLastLogin', previousLoginDate.toISOString());
+          console.log('Last login set to:', previousLoginDate.toLocaleString());
+        } else {
+          // First login - ensure adminLastLogin is not set (or clear it if it exists)
+          localStorage.removeItem('adminLastLogin');
+          console.log('First login detected - no previous login');
         }
-        // If no previous login, adminLastLogin will remain null (will show "First login")
         
-        // STEP 5: Save NEW login timestamp as the "last login" for NEXT session
+        // STEP 5: Save NEW login timestamp as the "last login timestamp" for NEXT session
         // This ensures that on the next login, we'll know when this session started
         localStorage.setItem('adminLastLoginTimestamp', newLoginTimestamp.toString());
+        console.log('Current login timestamp saved:', new Date(newLoginTimestamp).toLocaleString());
         
         // STEP 6: Save to login history for reference
         const loginHistory = JSON.parse(localStorage.getItem('adminLoginHistory') || '[]');
@@ -589,11 +601,11 @@
         document.getElementById('total-views').textContent = (viewsResult.count || 0).toLocaleString();
         document.getElementById('unique-visitors').textContent = (visitorsResult.count || 0).toLocaleString();
         document.getElementById('total-messages').textContent = (messagesResult.count || 0).toLocaleString();
-        
-        // Show success status
-        const statusDiv = document.getElementById('connection-status');
-        statusDiv.className = 'alert alert-success';
-        statusDiv.style.display = 'block';
+          
+          // Show success status
+          const statusDiv = document.getElementById('connection-status');
+          statusDiv.className = 'alert alert-success';
+          statusDiv.style.display = 'block';
         document.getElementById('status-message').textContent = '✅ Connected to Supabase database successfully!';
 
         // Load visitor activity
@@ -620,7 +632,7 @@
         if (!messagesData || messagesData.length === 0) {
           messagesTbody.innerHTML = '<tr><td colspan="8" class="text-center text-info">📭 No messages yet. Messages will appear here when someone contacts you through the portfolio.</td></tr>';
           document.getElementById('messages-view-more-btn').style.display = 'none';
-        } else {
+          } else {
           renderMessagesTable(10); // Show first 10
           // Show view more button if there are more than 10 items
           if (messagesData.length > 10) {

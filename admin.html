@@ -144,6 +144,22 @@
         <i class="bi bi-arrow-clockwise"></i> Refresh Data
       </button>
 
+      <div class="row mb-4">
+        <div class="col-md-12">
+          <div class="stat-card">
+            <h5 class="mb-3"><i class="bi bi-clock-history"></i> Admin Information</h5>
+            <div class="row">
+              <div class="col-md-6">
+                <strong>Current Login Time:</strong> <span id="current-login-time">-</span>
+              </div>
+              <div class="col-md-6">
+                <strong>Last Login Time:</strong> <span id="last-login-time">-</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div class="row" id="stats-container">
         <div class="col-md-4">
           <div class="stat-card">
@@ -161,6 +177,57 @@
           <div class="stat-card">
             <div class="stat-number" id="total-messages">-</div>
             <div class="stat-label">Messages Received</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="row mt-4">
+        <div class="col-md-12">
+          <div class="stat-card">
+            <h3 class="mb-3"><i class="bi bi-people"></i> Recent Visitor Activity</h3>
+            <div class="table-responsive">
+              <table class="table table-dark table-hover">
+                <thead>
+                  <tr>
+                    <th>IP Address</th>
+                    <th>First Visit</th>
+                    <th>Last Visit</th>
+                    <th>Visit Count</th>
+                    <th>User Agent</th>
+                  </tr>
+                </thead>
+                <tbody id="visitors-table">
+                  <tr>
+                    <td colspan="5" class="text-center">Loading...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="row mt-4">
+        <div class="col-md-12">
+          <div class="stat-card">
+            <h3 class="mb-3"><i class="bi bi-eye"></i> Recent Profile Views</h3>
+            <div class="table-responsive">
+              <table class="table table-dark table-hover">
+                <thead>
+                  <tr>
+                    <th>IP Address</th>
+                    <th>View Time</th>
+                    <th>Referrer</th>
+                    <th>User Agent</th>
+                  </tr>
+                </thead>
+                <tbody id="views-table">
+                  <tr>
+                    <td colspan="4" class="text-center">Loading...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </div>
@@ -230,8 +297,33 @@
     function showDashboard() {
       document.getElementById('login-container').style.display = 'none';
       document.getElementById('dashboard-container').style.display = 'block';
+      
+      // Display admin login times
+      updateAdminLoginTimes();
+      
       // Load analytics when dashboard is shown
       setTimeout(loadAnalytics, 500);
+    }
+
+    // Update admin login times display
+    function updateAdminLoginTimes() {
+      // Current login time
+      const currentLoginTime = sessionStorage.getItem('adminLoginTime');
+      if (currentLoginTime) {
+        const loginDate = new Date(parseInt(currentLoginTime));
+        document.getElementById('current-login-time').textContent = loginDate.toLocaleString();
+      } else {
+        document.getElementById('current-login-time').textContent = 'Just now';
+      }
+      
+      // Last login time (from localStorage)
+      const lastLogin = localStorage.getItem('adminLastLogin');
+      if (lastLogin) {
+        const lastLoginDate = new Date(lastLogin);
+        document.getElementById('last-login-time').textContent = lastLoginDate.toLocaleString();
+      } else {
+        document.getElementById('last-login-time').textContent = 'First login';
+      }
     }
 
     // Handle login form submission
@@ -249,8 +341,16 @@
       // Validate credentials
       if (username === ADMIN_CREDENTIALS.username && password === ADMIN_CREDENTIALS.password) {
         // Set authentication in sessionStorage
+        const loginTime = new Date().toISOString();
         sessionStorage.setItem('adminAuthenticated', 'true');
         sessionStorage.setItem('adminLoginTime', Date.now().toString());
+        
+        // Save last login time to localStorage (persists across sessions)
+        localStorage.setItem('adminLastLogin', loginTime);
+        localStorage.setItem('adminLoginHistory', JSON.stringify([
+          ...(JSON.parse(localStorage.getItem('adminLoginHistory') || '[]')),
+          { timestamp: loginTime, date: new Date(loginTime).toLocaleString() }
+        ].slice(-10))); // Keep last 10 logins
         
         // Show dashboard
         showDashboard();
@@ -380,6 +480,12 @@
         statusDiv.className = 'alert alert-success';
         statusDiv.style.display = 'block';
         document.getElementById('status-message').textContent = '✅ Connected to Supabase database successfully!';
+
+        // Load visitor activity
+        await loadVisitorActivity();
+        
+        // Load recent profile views
+        await loadRecentViews();
 
         // Load messages
         const { data: messagesData, error: messagesError } = await supabase
@@ -590,6 +696,114 @@
       } catch (error) {
         console.error('Error deleting message:', error);
         alert('Error deleting message: ' + error.message);
+      }
+    }
+
+    // Load visitor activity
+    async function loadVisitorActivity() {
+      const tbody = document.getElementById('visitors-table');
+      const supabase = getSupabaseClient();
+      
+      if (!supabase) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-danger">⚠️ Supabase client not initialized</td></tr>';
+        return;
+      }
+
+      try {
+        const { data: visitorsData, error: visitorsError } = await supabase
+          .from('visitors')
+          .select('*')
+          .order('last_visit', { ascending: false })
+          .limit(50);
+
+        if (visitorsError) {
+          throw visitorsError;
+        }
+
+        if (!visitorsData || visitorsData.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="5" class="text-center text-info">📭 No visitor data yet.</td></tr>';
+        } else {
+          tbody.innerHTML = visitorsData.map(visitor => {
+            const escapeHtml = (text) => {
+              if (!text) return 'N/A';
+              const div = document.createElement('div');
+              div.textContent = text;
+              return div.innerHTML;
+            };
+            
+            const userAgent = visitor.user_agent || 'Unknown';
+            const shortUserAgent = userAgent.length > 50 ? userAgent.substring(0, 50) + '...' : userAgent;
+            const firstVisit = visitor.first_visit ? new Date(visitor.first_visit).toLocaleString() : 'N/A';
+            const lastVisit = visitor.last_visit ? new Date(visitor.last_visit).toLocaleString() : 'N/A';
+            
+            return `
+              <tr>
+                <td>${escapeHtml(visitor.ip_address || 'Unknown')}</td>
+                <td>${firstVisit}</td>
+                <td><strong>${lastVisit}</strong></td>
+                <td><span class="badge bg-info">${visitor.visit_count || 1}</span></td>
+                <td title="${escapeHtml(userAgent)}">${escapeHtml(shortUserAgent)}</td>
+              </tr>
+            `;
+          }).join('');
+        }
+      } catch (error) {
+        console.error('Error loading visitor activity:', error);
+        tbody.innerHTML = `<tr><td colspan="5" class="text-center text-danger">⚠️ Error loading visitor data: ${error.message}</td></tr>`;
+      }
+    }
+
+    // Load recent profile views
+    async function loadRecentViews() {
+      const tbody = document.getElementById('views-table');
+      const supabase = getSupabaseClient();
+      
+      if (!supabase) {
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-danger">⚠️ Supabase client not initialized</td></tr>';
+        return;
+      }
+
+      try {
+        const { data: viewsData, error: viewsError } = await supabase
+          .from('profile_views')
+          .select('*')
+          .order('viewed_at', { ascending: false })
+          .limit(50);
+
+        if (viewsError) {
+          throw viewsError;
+        }
+
+        if (!viewsData || viewsData.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="4" class="text-center text-info">📭 No view data yet.</td></tr>';
+        } else {
+          tbody.innerHTML = viewsData.map(view => {
+            const escapeHtml = (text) => {
+              if (!text) return 'N/A';
+              const div = document.createElement('div');
+              div.textContent = text;
+              return div.innerHTML;
+            };
+            
+            const userAgent = view.user_agent || 'Unknown';
+            const shortUserAgent = userAgent.length > 40 ? userAgent.substring(0, 40) + '...' : userAgent;
+            const viewTime = view.viewed_at ? new Date(view.viewed_at).toLocaleString() : 'N/A';
+            const referrer = view.referrer && view.referrer !== 'direct' ? view.referrer : 'Direct';
+            const shortReferrer = referrer.length > 40 ? referrer.substring(0, 40) + '...' : referrer;
+            
+            return `
+              <tr>
+                <td>${escapeHtml(view.ip_address || 'Unknown')}</td>
+                <td><strong>${viewTime}</strong></td>
+                <td title="${escapeHtml(referrer)}">${escapeHtml(shortReferrer)}</td>
+                <td title="${escapeHtml(userAgent)}">${escapeHtml(shortUserAgent)}</td>
+              </tr>
+            `;
+          }).join('');
+        }
+      } catch (error) {
+        console.error('Error loading recent views:', error);
+        tbody.innerHTML = `<tr><td colspan="4" class="text-center text-danger">⚠️ Error loading view data: ${error.message}</td></tr>`;
       }
     }
   </script>

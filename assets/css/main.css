@@ -498,6 +498,8 @@ section,
   background-color: var(--background-color);
   padding: 60px 0;
   overflow: clip;
+  position: relative;
+  z-index: 1;
 }
 
 /*--------------------------------------------------------------
@@ -2557,7 +2559,7 @@ section,
   position: fixed;
   border-radius: 50%;
   pointer-events: none;
-  z-index: 9999;
+  z-index: 999999;
   mix-blend-mode: difference;
   transition: transform 0.1s ease-out;
 }
@@ -2575,7 +2577,7 @@ section,
               border-radius 0.2s ease;
   border-radius: 50%;
   box-shadow: 0 0 8px rgba(236, 236, 236, 0.8);
-  z-index: 10000;
+  z-index: 999999;
 }
 
 .custom-cursor.text-cursor {

@@ -79,14 +79,47 @@
   // Start animation
   animateCursor();
 
-  // Check if element is text content
+  // Check if element is interactive (should show box cursor)
+  function isInteractiveElement(element) {
+    if (!element) return false;
+    
+    const tagName = element.tagName.toLowerCase();
+    const interactiveTags = ['a', 'button', 'input', 'textarea', 'select'];
+    
+    // Direct interactive tags
+    if (interactiveTags.includes(tagName)) return true;
+    if (element.hasAttribute('role') && element.getAttribute('role') === 'button') return true;
+    
+    // Check for interactive classes
+    const interactiveClasses = [
+      'btn', 'portfolio-wrap', 'service-card', 'scroll-top', 
+      'portfolio-item', 'card-action', 'portfolio-links',
+      'navmenu', 'resume-item', 'skill-item', 'stat-card',
+      'portfolio-info', 'service-icon', 'contact-form'
+    ];
+    
+    for (const className of interactiveClasses) {
+      if (element.classList.contains(className)) return true;
+      if (element.closest('.' + className)) return true;
+    }
+    
+    // Check if it's inside a button or link
+    if (element.closest('a, button, .btn')) return true;
+    
+    return false;
+  }
+
+  // Check if element is text content (and not interactive)
   function isTextElement(element) {
     if (!element) return false;
     
-    const textTags = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'span', 'li', 'td', 'th', 'label', 'strong', 'em', 'b', 'i', 'a'];
+    // If it's interactive, it's not text
+    if (isInteractiveElement(element)) return false;
+    
+    const textTags = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'span', 'li', 'td', 'th', 'label', 'strong', 'em', 'b', 'i'];
     const tagName = element.tagName.toLowerCase();
     
-    // Check if it's a text tag
+    // Check if it's a text tag (but not 'a' which is interactive)
     if (textTags.includes(tagName)) return true;
     
     // Check if it contains text and is not an interactive element
@@ -105,18 +138,22 @@
     return false;
   }
 
-  // Find the hoverable element (closest interactive element or text)
+  // Find the hoverable element (prioritize interactive over text)
   function findHoverableElement(element) {
     if (!element) return null;
     
-    // Check if element itself is interactive
-    const tagName = element.tagName.toLowerCase();
-    const interactiveTags = ['a', 'button', 'input', 'textarea', 'select'];
+    // First check if it's interactive (buttons, links, etc.)
+    if (isInteractiveElement(element)) {
+      return element;
+    }
     
-    if (interactiveTags.includes(tagName)) return element;
-    if (element.hasAttribute('role') && element.getAttribute('role') === 'button') return element;
+    // Check for interactive elements in parent
+    const interactiveParent = element.closest('a, button, .btn, [role="button"]');
+    if (interactiveParent) {
+      return interactiveParent;
+    }
     
-    // Check for interactive classes
+    // Check for interactive classes in parent
     const interactiveClasses = [
       'btn', 'portfolio-wrap', 'service-card', 'scroll-top', 
       'portfolio-item', 'card-action', 'portfolio-links',
@@ -125,21 +162,16 @@
     ];
     
     for (const className of interactiveClasses) {
-      if (element.classList.contains(className)) return element;
       const parent = element.closest('.' + className);
       if (parent) return parent;
     }
-    
-    // Check for links and buttons in parent
-    const linkOrButton = element.closest('a, button, .btn');
-    if (linkOrButton) return linkOrButton;
     
     // Check navigation menu
     if (element.closest('.navmenu')) {
       return element.closest('.navmenu a') || element.closest('.navmenu');
     }
     
-    // Check if it's a text element
+    // Only if not interactive, check if it's a text element
     if (isTextElement(element)) {
       return element;
     }

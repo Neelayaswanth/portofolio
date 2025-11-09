@@ -2563,47 +2563,30 @@ section,
 }
 
 .custom-cursor {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
   background-color: #ececec;
   transform: translate(-50%, -50%);
   will-change: transform;
-  transition: background-color 0.3s ease, transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
-  box-shadow: 0 0 15px currentColor;
+  transition: background-color 0.3s ease, transform 0.2s ease;
   border-radius: 50%;
 }
 
 .custom-cursor-follower {
   width: 40px;
   height: 40px;
-  border: 2px solid #ececec;
+  border: 1px solid #ececec;
   background-color: transparent;
   transform: translate(-50%, -50%);
-  transition: border-radius 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), 
-              border-color 0.4s ease, 
-              background-color 0.4s ease,
-              transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1),
-              box-shadow 0.4s ease;
+  transition: border-radius 0.3s ease-out, 
+              border-color 0.3s ease, 
+              background-color 0.3s ease;
   will-change: transform, width, height, border-radius;
-  box-shadow: 0 0 25px rgba(236, 236, 236, 0.4);
   border-radius: 50%;
 }
 
 .custom-cursor-follower[data-filling="true"] {
-  background-color: rgba(236, 236, 236, 0.2);
-  border-width: 2px;
-  animation: cursorFillPulse 2s ease-in-out infinite;
-}
-
-@keyframes cursorFillPulse {
-  0%, 100% {
-    opacity: 1;
-    transform: translate(-50%, -50%) scale(1);
-  }
-  50% {
-    opacity: 0.95;
-    transform: translate(-50%, -50%) scale(1.02);
-  }
+  border-width: 1px;
 }
 
 /* Hide default cursor on desktop */
@@ -2620,22 +2603,10 @@ section,
 /* Cursor hover effects */
 .custom-cursor.hover {
   opacity: 1;
-  transform: translate(-50%, -50%) scale(1.3);
-  box-shadow: 0 0 20px currentColor;
 }
 
 .custom-cursor-follower.hover {
-  border-width: 2px;
-  animation: cursorHoverGlow 1.5s ease-in-out infinite;
-}
-
-@keyframes cursorHoverGlow {
-  0%, 100% {
-    box-shadow: 0 0 30px currentColor, inset 0 0 20px currentColor;
-  }
-  50% {
-    box-shadow: 0 0 40px currentColor, inset 0 0 30px currentColor;
-  }
+  border-width: 1px;
 }
 
 /* Cursor filling effect is handled by JavaScript */

@@ -87,6 +87,63 @@
     return fontSize || 16;
   }
 
+  // Get color from element (border, background, or text color)
+  function getElementColor(element) {
+    if (!element) return hoverColor;
+    
+    const computedStyle = window.getComputedStyle(element);
+    
+    // Try to get border color first
+    let color = computedStyle.borderColor || computedStyle.borderTopColor;
+    if (color && color !== 'rgba(0, 0, 0, 0)' && color !== 'transparent') {
+      return rgbToHex(color);
+    }
+    
+    // Try background color
+    color = computedStyle.backgroundColor;
+    if (color && color !== 'rgba(0, 0, 0, 0)' && color !== 'transparent') {
+      // Check if it's a visible color (not fully transparent)
+      const rgbMatch = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
+      if (rgbMatch) {
+        const alpha = rgbMatch[4] ? parseFloat(rgbMatch[4]) : 1;
+        if (alpha > 0.1) {
+          return rgbToHex(color);
+        }
+      }
+    }
+    
+    // Try accent color or CSS variable
+    color = computedStyle.getPropertyValue('--accent-color') || 
+            computedStyle.getPropertyValue('accent-color');
+    if (color) {
+      return color.trim();
+    }
+    
+    // Default to hover color
+    return hoverColor;
+  }
+
+  // Convert RGB/RGBA to hex
+  function rgbToHex(rgb) {
+    if (!rgb) return hoverColor;
+    
+    // If already hex, return it
+    if (rgb.startsWith('#')) {
+      return rgb;
+    }
+    
+    // Extract RGB values
+    const rgbMatch = rgb.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*[\d.]+)?\)/);
+    if (rgbMatch) {
+      const r = parseInt(rgbMatch[1]).toString(16).padStart(2, '0');
+      const g = parseInt(rgbMatch[2]).toString(16).padStart(2, '0');
+      const b = parseInt(rgbMatch[3]).toString(16).padStart(2, '0');
+      return `#${r}${g}${b}`;
+    }
+    
+    return hoverColor;
+  }
+
   // Update mouse position
   document.addEventListener('mousemove', (e) => {
     mouseX = e.clientX;
@@ -217,8 +274,9 @@
       targetX = rect.left + (rect.width / 2);
       targetY = rect.top + (rect.height / 2);
       
-      // Change to orange border only when hovering (no fill)
-      cursorFollower.style.borderColor = hoverColor;
+      // Get color from element and apply to cursor border
+      const elementColor = getElementColor(hoverableElement);
+      cursorFollower.style.borderColor = elementColor;
       
       // Add hover class
       cursor.classList.add('hover');

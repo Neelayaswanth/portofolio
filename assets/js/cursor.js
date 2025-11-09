@@ -134,10 +134,8 @@
       targetX = rect.left + (rect.width / 2);
       targetY = rect.top + (rect.height / 2);
       
-      // Change to orange color when hovering
-      cursor.style.backgroundColor = hoverColor;
+      // Change to orange border only when hovering (no fill)
       cursorFollower.style.borderColor = hoverColor;
-      cursorFollower.style.backgroundColor = hoverColor + '20';
       
       // Add hover class
       cursor.classList.add('hover');
@@ -163,10 +161,8 @@
         targetX = mouseX;
         targetY = mouseY;
         
-        // Reset to default color
-        cursor.style.backgroundColor = defaultColor;
+        // Reset to default color (border only)
         cursorFollower.style.borderColor = defaultColor;
-        cursorFollower.style.backgroundColor = 'transparent';
         
         // Remove hover class
         cursor.classList.remove('hover');
@@ -226,9 +222,7 @@
         cursor.classList.remove('hover');
         cursorFollower.classList.remove('hover');
         cursorFollower.removeAttribute('data-filling');
-        cursor.style.backgroundColor = defaultColor;
         cursorFollower.style.borderColor = defaultColor;
-        cursorFollower.style.backgroundColor = 'transparent';
       }
     }, 250);
   });

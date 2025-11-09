@@ -362,6 +362,76 @@
     }
   });
 
+  // Update cursor border when hovering over element
+  function updateCursorBorder() {
+    if (isHovering && currentHoverElement) {
+      // Check if element is still in the DOM
+      if (!document.body.contains(currentHoverElement)) {
+        currentHoverElement = null;
+        isHovering = false;
+        targetWidth = 30;
+        targetHeight = 30;
+        targetX = mouseX;
+        targetY = mouseY;
+        cursor.classList.remove('hover');
+        cursorFollower.classList.remove('hover');
+        cursorFollower.removeAttribute('data-filling');
+        cursorFollower.style.borderColor = defaultColor;
+        return;
+      }
+      
+      // Get updated element's bounding box
+      const rect = currentHoverElement.getBoundingClientRect();
+      const padding = 12;
+      
+      // Update target size and position
+      targetWidth = rect.width + (padding * 2);
+      targetHeight = rect.height + (padding * 2);
+      targetX = rect.left + (rect.width / 2);
+      targetY = rect.top + (rect.height / 2);
+      
+      // Check if mouse is still over the element
+      const isMouseOver = mouseX >= rect.left && 
+                         mouseX <= rect.right && 
+                         mouseY >= rect.top && 
+                         mouseY <= rect.bottom;
+      
+      if (!isMouseOver) {
+        // Mouse is no longer over element, reset
+        currentHoverElement = null;
+        isHovering = false;
+        targetWidth = 30;
+        targetHeight = 30;
+        targetX = mouseX;
+        targetY = mouseY;
+        cursor.classList.remove('hover');
+        cursorFollower.classList.remove('hover');
+        cursorFollower.removeAttribute('data-filling');
+        cursorFollower.style.borderColor = defaultColor;
+      }
+    }
+  }
+
+  // Handle scroll - update cursor border shape
+  let scrollTimer;
+  window.addEventListener('scroll', () => {
+    if (isHovering && currentHoverElement) {
+      updateCursorBorder();
+    }
+  }, { passive: true });
+
+  // Also update on mouse move while hovering (for smooth updates)
+  const originalMouseMove = document.addEventListener;
+  document.addEventListener('mousemove', (e) => {
+    if (isHovering && currentHoverElement) {
+      // Throttle updates during mouse move
+      clearTimeout(scrollTimer);
+      scrollTimer = setTimeout(() => {
+        updateCursorBorder();
+      }, 16); // ~60fps
+    }
+  });
+
   // Handle window resize
   let resizeTimer;
   window.addEventListener('resize', () => {
@@ -375,25 +445,30 @@
         cursorFollower.style.display = 'block';
       }
       
-      // Reset hover state on resize
-      if (isHovering) {
-        currentHoverElement = null;
-        isHovering = false;
-        targetWidth = 40;
-        targetHeight = 40;
-        targetX = mouseX;
-        targetY = mouseY;
-        cursor.classList.remove('hover');
-        cursorFollower.classList.remove('hover');
-        cursorFollower.removeAttribute('data-filling');
-        cursorFollower.style.borderColor = defaultColor;
+      // Update cursor border if hovering
+      if (isHovering && currentHoverElement) {
+        updateCursorBorder();
+      } else {
+        // Reset hover state on resize
+        if (isHovering) {
+          currentHoverElement = null;
+          isHovering = false;
+          targetWidth = 30;
+          targetHeight = 30;
+          targetX = mouseX;
+          targetY = mouseY;
+          cursor.classList.remove('hover');
+          cursorFollower.classList.remove('hover');
+          cursorFollower.removeAttribute('data-filling');
+          cursorFollower.style.borderColor = defaultColor;
+        }
       }
       
       if (isTextMode) {
         isTextMode = false;
         cursor.classList.remove('text-cursor');
-      cursor.style.height = '5px';
-      cursor.style.width = '5px';
+        cursor.style.height = '5px';
+        cursor.style.width = '5px';
         cursor.style.borderRadius = '50%';
         cursor.style.backgroundColor = defaultColor;
         cursorFollower.style.opacity = '1';

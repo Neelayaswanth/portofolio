@@ -331,7 +331,7 @@
 
     // Update admin login times display
     function updateAdminLoginTimes() {
-      // Current login time (from sessionStorage - this session's login)
+      // Current login time
       const currentLoginTime = sessionStorage.getItem('adminLoginTime');
       if (currentLoginTime) {
         const loginDate = new Date(parseInt(currentLoginTime));
@@ -340,25 +340,13 @@
         document.getElementById('current-login-time').textContent = 'Just now';
       }
       
-      // Last login time (from localStorage - previous session's login)
+      // Last login time (from localStorage)
       const lastLogin = localStorage.getItem('adminLastLogin');
       if (lastLogin) {
         const lastLoginDate = new Date(lastLogin);
         document.getElementById('last-login-time').textContent = lastLoginDate.toLocaleString();
       } else {
-        // Check if this is truly the first login by checking login history
-        const loginHistory = JSON.parse(localStorage.getItem('adminLoginHistory') || '[]');
-        if (loginHistory.length <= 1) {
-          document.getElementById('last-login-time').textContent = 'First login';
-        } else {
-          // If there's history but no last login stored, use the second entry in history
-          const previousLogin = loginHistory[1];
-          if (previousLogin) {
-            document.getElementById('last-login-time').textContent = previousLogin.date || new Date(previousLogin.timestamp).toLocaleString();
-          } else {
-            document.getElementById('last-login-time').textContent = 'First login';
-          }
-        }
+        document.getElementById('last-login-time').textContent = 'First login';
       }
     }
 
@@ -376,35 +364,17 @@
       
       // Validate credentials
       if (username === ADMIN_CREDENTIALS.username && password === ADMIN_CREDENTIALS.password) {
-        // Get the CURRENT login time from localStorage (from previous session or current session)
-        // This will become the "last login" after we update with new login time
-        const existingCurrentLogin = localStorage.getItem('adminCurrentLogin');
-        
-        // Set NEW current login time
-        const newLoginTime = Date.now();
-        const newLoginTimeISO = new Date().toISOString();
-        
         // Set authentication in sessionStorage
+        const loginTime = new Date().toISOString();
         sessionStorage.setItem('adminAuthenticated', 'true');
-        sessionStorage.setItem('adminLoginTime', newLoginTime.toString());
+        sessionStorage.setItem('adminLoginTime', Date.now().toString());
         
-        // If there's an existing current login, it becomes the "last login"
-        if (existingCurrentLogin) {
-          const lastLoginDate = new Date(parseInt(existingCurrentLogin));
-          localStorage.setItem('adminLastLogin', lastLoginDate.toISOString());
-        }
-        // If no existing current login, this is the first login, so don't set last login yet
-        
-        // Update current login time in localStorage (this will be "last login" for next session)
-        localStorage.setItem('adminCurrentLogin', newLoginTime.toString());
-        
-        // Save to login history
-        const loginHistory = JSON.parse(localStorage.getItem('adminLoginHistory') || '[]');
-        loginHistory.unshift({ 
-          timestamp: newLoginTimeISO, 
-          date: new Date(newLoginTimeISO).toLocaleString() 
-        });
-        localStorage.setItem('adminLoginHistory', JSON.stringify(loginHistory.slice(0, 10))); // Keep last 10 logins
+        // Save last login time to localStorage (persists across sessions)
+        localStorage.setItem('adminLastLogin', loginTime);
+        localStorage.setItem('adminLoginHistory', JSON.stringify([
+          ...(JSON.parse(localStorage.getItem('adminLoginHistory') || '[]')),
+          { timestamp: loginTime, date: new Date(loginTime).toLocaleString() }
+        ].slice(-10))); // Keep last 10 logins
         
         // Show dashboard
         showDashboard();
@@ -422,11 +392,6 @@
     // Logout function
     function logout() {
       if (confirm('Are you sure you want to logout?')) {
-        // On logout, the current login time is already saved in localStorage as 'adminCurrentLogin'
-        // This will be used as 'last login' when user logs in next time
-        // So we don't need to do anything special here
-        
-        // Clear session storage
         sessionStorage.removeItem('adminAuthenticated');
         sessionStorage.removeItem('adminLoginTime');
         showLogin();
@@ -447,16 +412,7 @@
 
     // Check authentication on page load
     document.addEventListener('DOMContentLoaded', function() {
-      // On page load, if user is already logged in, preserve the current login time
-      // and don't overwrite the last login
-      const isAuthenticated = sessionStorage.getItem('adminAuthenticated') === 'true';
-      if (isAuthenticated) {
-        // User is already logged in, just show dashboard without updating login times
-        checkAuthentication();
-      } else {
-        // User is not logged in, proceed with normal authentication check
-        checkAuthentication();
-      }
+      checkAuthentication();
       
       // Auto-logout after 2 hours of inactivity (optional security feature)
       const loginTime = sessionStorage.getItem('adminLoginTime');

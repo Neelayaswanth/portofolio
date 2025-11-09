@@ -1,6 +1,6 @@
 /**
  * Page Preloader Animation
- * Cricket ball comes from left, drops and reveals YASH letters
+ * Realistic cricket ball bouncing in 4 places, revealing YASH letters
  */
 
 (function() {
@@ -10,10 +10,17 @@
   const preloaderHTML = `
     <div id="page-preloader" class="page-preloader">
       <div class="preloader-content">
-        <div class="ball" id="ball">
-          <div class="seam seam-1"></div>
-          <div class="seam seam-2"></div>
-          <div class="seam seam-3"></div>
+        <div class="ball-container">
+          <div class="ball" id="ball">
+            <div class="ball-surface">
+              <div class="seam seam-main-1"></div>
+              <div class="seam seam-main-2"></div>
+              <div class="seam seam-cross-1"></div>
+              <div class="seam seam-cross-2"></div>
+              <div class="ball-highlight"></div>
+            </div>
+            <div class="ball-shadow" id="ballShadow"></div>
+          </div>
         </div>
         <div class="name-text" id="nameText">
           <span class="letter" data-position="1">Y</span>
@@ -30,6 +37,7 @@
 
   const preloader = document.getElementById('page-preloader');
   const ball = document.getElementById('ball');
+  const ballShadow = document.getElementById('ballShadow');
   const nameText = document.getElementById('nameText');
   const letters = nameText.querySelectorAll('.letter');
   const mainContent = document.body;
@@ -37,34 +45,62 @@
   // Hide main content initially
   mainContent.style.overflow = 'hidden';
 
-  // Realistic bounce physics
+  // Realistic bounce physics with rotation
+  let ballRotation = 0;
   function bounceBall(startX, startY, targetX, targetY, bounceCount, onComplete) {
-    const gravity = 0.5;
-    const bounceDecay = 0.7;
+    const gravity = 0.6;
+    const bounceDecay = 0.65;
+    const rotationSpeed = 15;
     let currentX = startX;
     let currentY = startY;
-    let velocityX = (targetX - startX) * 0.1;
+    let velocityX = (targetX - startX) * 0.12;
     let velocityY = 0;
     let bounces = 0;
+    let lastBounceY = startY;
     
     const animate = () => {
+      // Apply gravity
       velocityY += gravity;
+      
+      // Update position
       currentX += velocityX;
       currentY += velocityY;
       
+      // Rotate ball based on movement
+      ballRotation += rotationSpeed;
+      ball.style.transform = `translate(-50%, -50%) rotate(${ballRotation}deg)`;
+      
+      // Update shadow
+      const shadowSize = Math.max(30, 50 - (groundY - currentY) * 0.1);
+      const shadowOpacity = Math.max(0.2, 0.6 - (groundY - currentY) * 0.01);
+      ballShadow.style.width = shadowSize + 'px';
+      ballShadow.style.height = shadowSize * 0.3 + 'px';
+      ballShadow.style.opacity = shadowOpacity;
+      ballShadow.style.left = currentX + 'px';
+      
+      // Ground collision
       const groundY = window.innerHeight - 50;
       if (currentY >= groundY) {
         currentY = groundY;
         velocityY *= -bounceDecay;
-        velocityX *= 0.95;
+        velocityX *= 0.92; // Friction
         bounces++;
         
-        ball.style.transform = `translate(-50%, -50%) scale(0.9)`;
+        // Squash effect on bounce
+        ball.style.transform = `translate(-50%, -50%) rotate(${ballRotation}deg) scaleY(0.7) scaleX(1.2)`;
         setTimeout(() => {
-          ball.style.transform = `translate(-50%, -50%) scale(1)`;
-        }, 100);
+          ball.style.transform = `translate(-50%, -50%) rotate(${ballRotation}deg) scale(1)`;
+        }, 120);
         
-        if (bounces >= bounceCount || Math.abs(velocityY) < 0.5) {
+        // Shadow expands on bounce
+        ballShadow.style.width = '60px';
+        ballShadow.style.height = '20px';
+        setTimeout(() => {
+          ballShadow.style.width = shadowSize + 'px';
+          ballShadow.style.height = shadowSize * 0.3 + 'px';
+        }, 120);
+        
+        if (bounces >= bounceCount || Math.abs(velocityY) < 0.3) {
           currentY = groundY;
           velocityY = 0;
           if (onComplete) onComplete();
@@ -72,6 +108,7 @@
         }
       }
       
+      // Update ball position
       ball.style.left = currentX + 'px';
       ball.style.top = currentY + 'px';
       
@@ -95,7 +132,7 @@
     ];
     
     const startX = -100;
-    const startY = window.innerHeight * 0.3;
+    const startY = window.innerHeight * 0.25;
     const groundY = window.innerHeight - 50;
     
     let letterIndex = 0;
@@ -107,6 +144,7 @@
         setTimeout(() => {
           ball.style.opacity = '0';
           ball.style.transition = 'opacity 0.5s ease-out';
+          ballShadow.style.opacity = '0';
           
           setTimeout(() => {
             letters.forEach((letter, index) => {
@@ -135,45 +173,53 @@
       
       const targetX = positions[letterIndex];
       
-      // Ball comes from left and drops at target position
+      // Ball comes from left and moves to position
       ball.style.left = currentX + 'px';
       ball.style.top = startY + 'px';
       ball.style.opacity = '1';
-      ball.style.transform = 'translate(-50%, -50%) scale(1)';
+      ball.style.transform = 'translate(-50%, -50%) rotate(0deg) scale(1)';
+      ballShadow.style.opacity = '0.3';
       
-      // Move ball horizontally first, then drop
+      // Move ball horizontally first
       setTimeout(() => {
-        // Move to target X position
         ball.style.left = targetX + 'px';
-        ball.style.transition = 'left 0.8s ease-in-out';
+        ball.style.transition = 'left 0.7s ease-in-out';
+        
+        // Rotate while moving
+        let moveRotation = 0;
+        const rotateInterval = setInterval(() => {
+          moveRotation += 20;
+          ball.style.transform = `translate(-50%, -50%) rotate(${moveRotation}deg)`;
+        }, 50);
         
         // When ball reaches target X, drop it
         setTimeout(() => {
+          clearInterval(rotateInterval);
           ball.style.transition = 'none';
           
-          // Drop and bounce
-          bounceBall(targetX, startY, targetX, groundY, 2, () => {
+          // Drop and bounce with realistic physics
+          bounceBall(targetX, startY, targetX, groundY, 3, () => {
             // Reveal letter when ball stops bouncing
             const letter = letters[letterIndex];
             letter.style.opacity = '1';
             letter.style.transform = 'translate(-50%, -50%) scale(1)';
             letter.style.left = targetX + 'px';
             
-            // Small bounce effect on letter
+            // Bounce effect on letter
             setTimeout(() => {
-              letter.style.transform = 'translate(-50%, -50%) scale(1.2)';
+              letter.style.transform = 'translate(-50%, -50%) scale(1.3)';
               setTimeout(() => {
                 letter.style.transform = 'translate(-50%, -50%) scale(1)';
-              }, 150);
+              }, 200);
             }, 100);
             
             currentX = targetX;
             letterIndex++;
             
             // Move to next position
-            setTimeout(animateNextLetter, 500);
+            setTimeout(animateNextLetter, 600);
           });
-        }, 800);
+        }, 700);
       }, 100);
     }
     

@@ -331,64 +331,82 @@
 
     // Update admin login times display
     function updateAdminLoginTimes() {
-      // Current login time (from sessionStorage - this session)
+      // Get current login time from sessionStorage (this session's login)
       const currentLoginTime = sessionStorage.getItem('adminLoginTime');
-      let currentLoginDate = null;
       if (currentLoginTime) {
-        currentLoginDate = new Date(parseInt(currentLoginTime));
+        const currentLoginDate = new Date(parseInt(currentLoginTime));
         document.getElementById('current-login-time').textContent = currentLoginDate.toLocaleString();
       } else {
         document.getElementById('current-login-time').textContent = 'Just now';
       }
       
-      // Last login time (from localStorage - previous session)
-      const lastLogin = localStorage.getItem('adminLastLogin');
-      const currentLoginInStorage = localStorage.getItem('adminCurrentLogin');
+      // Get last login time from localStorage
+      // This should be set from a PREVIOUS login session
+      const lastLoginISO = localStorage.getItem('adminLastLogin');
+      const currentLoginTimestamp = currentLoginTime ? parseInt(currentLoginTime) : 0;
       
-      if (lastLogin) {
-        const lastLoginDate = new Date(lastLogin);
-        const lastLoginTimeValue = lastLoginDate.getTime();
-        const currentLoginTimeValue = currentLoginDate ? currentLoginDate.getTime() : 0;
+      if (lastLoginISO) {
+        const lastLoginDate = new Date(lastLoginISO);
+        const lastLoginTimestamp = lastLoginDate.getTime();
         
-        // Verify that last login is actually different from current login
-        // They should be at least 1 second apart
-        if (Math.abs(lastLoginTimeValue - currentLoginTimeValue) > 1000) {
+        // Ensure last login is different from current login
+        // They must be at least 2 seconds apart (to account for timing issues)
+        const timeDifference = Math.abs(lastLoginTimestamp - currentLoginTimestamp);
+        
+        if (timeDifference > 2000) {
+          // Last login is different from current - display it
           document.getElementById('last-login-time').textContent = lastLoginDate.toLocaleString();
         } else {
-          // If they're the same, this might be the first login
-          // Check login history for a previous login
+          // Times are too close - likely same login, check history
           const loginHistory = JSON.parse(localStorage.getItem('adminLoginHistory') || '[]');
+          
+          // Look for a previous login in history that's different
           if (loginHistory.length > 1) {
-            // Get the second entry (previous login)
-            const previousLogin = loginHistory[1];
-            if (previousLogin && previousLogin.timestamp) {
-              const prevDate = new Date(previousLogin.timestamp);
-              if (Math.abs(prevDate.getTime() - currentLoginTimeValue) > 1000) {
-                document.getElementById('last-login-time').textContent = previousLogin.date || prevDate.toLocaleString();
-              } else {
-                document.getElementById('last-login-time').textContent = 'First login';
+            // Get the second most recent login (index 1, since index 0 is current)
+            for (let i = 1; i < loginHistory.length; i++) {
+              const histEntry = loginHistory[i];
+              if (histEntry.timestamp_ms) {
+                const histTime = parseInt(histEntry.timestamp_ms);
+                if (Math.abs(histTime - currentLoginTimestamp) > 2000) {
+                  // Found a different login time
+                  const histDate = new Date(histTime);
+                  document.getElementById('last-login-time').textContent = histDate.toLocaleString();
+                  return; // Exit function
+                }
+              } else if (histEntry.timestamp) {
+                // Fallback to ISO string timestamp
+                const histDate = new Date(histEntry.timestamp);
+                const histTime = histDate.getTime();
+                if (Math.abs(histTime - currentLoginTimestamp) > 2000) {
+                  document.getElementById('last-login-time').textContent = histDate.toLocaleString();
+                  return; // Exit function
+                }
               }
-            } else {
-              document.getElementById('last-login-time').textContent = 'First login';
             }
-          } else {
-            document.getElementById('last-login-time').textContent = 'First login';
           }
+          
+          // No valid previous login found - this is likely first login
+          document.getElementById('last-login-time').textContent = 'First login';
         }
       } else {
-        // No last login stored - check if this is truly first login
+        // No last login stored - check history
         const loginHistory = JSON.parse(localStorage.getItem('adminLoginHistory') || '[]');
-        if (loginHistory.length <= 1) {
-          document.getElementById('last-login-time').textContent = 'First login';
-        } else {
-          // There's history but no last login - use second entry
-          const previousLogin = loginHistory[1];
-          if (previousLogin && previousLogin.timestamp) {
-            document.getElementById('last-login-time').textContent = previousLogin.date || new Date(previousLogin.timestamp).toLocaleString();
-          } else {
-            document.getElementById('last-login-time').textContent = 'First login';
+        if (loginHistory.length > 1) {
+          // Try to find a previous login in history
+          for (let i = 1; i < loginHistory.length; i++) {
+            const histEntry = loginHistory[i];
+            if (histEntry.timestamp_ms) {
+              const histDate = new Date(parseInt(histEntry.timestamp_ms));
+              document.getElementById('last-login-time').textContent = histDate.toLocaleString();
+              return;
+            } else if (histEntry.timestamp) {
+              const histDate = new Date(histEntry.timestamp);
+              document.getElementById('last-login-time').textContent = histDate.toLocaleString();
+              return;
+            }
           }
         }
+        document.getElementById('last-login-time').textContent = 'First login';
       }
     }
 
@@ -406,38 +424,38 @@
       
       // Validate credentials
       if (username === ADMIN_CREDENTIALS.username && password === ADMIN_CREDENTIALS.password) {
-        // IMPORTANT: Get the PREVIOUS login time FIRST (before updating)
-        // This is the time that should be shown as "last login"
-        const previousLoginTime = localStorage.getItem('adminCurrentLogin');
+        // STEP 1: Get the PREVIOUS login timestamp from localStorage
+        // This represents the last time the user logged in (from any previous session)
+        const previousLoginTimestamp = localStorage.getItem('adminLastLoginTimestamp');
         
-        // Set NEW current login time
-        const newLoginTime = Date.now();
+        // STEP 2: Create NEW login timestamp
+        const newLoginTimestamp = Date.now();
         const newLoginTimeISO = new Date().toISOString();
         
-        // Set authentication in sessionStorage
+        // STEP 3: Set authentication in sessionStorage (current session only)
         sessionStorage.setItem('adminAuthenticated', 'true');
-        sessionStorage.setItem('adminLoginTime', newLoginTime.toString());
+        sessionStorage.setItem('adminLoginTime', newLoginTimestamp.toString());
         
-        // If there was a previous login, save it as "last login"
-        // Only do this if previousLoginTime exists and is different from current
-        if (previousLoginTime) {
-          const previousTime = parseInt(previousLoginTime);
-          // Make sure it's actually a previous login (at least 1 second ago)
-          if (newLoginTime - previousTime > 1000) {
-            const previousLoginDate = new Date(previousTime);
-            localStorage.setItem('adminLastLogin', previousLoginDate.toISOString());
-          }
+        // STEP 4: Update last login information
+        // If there was a previous login, we already have it stored
+        // If this is the first login, previousLoginTimestamp will be null
+        if (previousLoginTimestamp) {
+          // Convert timestamp to ISO string for storage
+          const previousLoginDate = new Date(parseInt(previousLoginTimestamp));
+          localStorage.setItem('adminLastLogin', previousLoginDate.toISOString());
         }
+        // If no previous login, adminLastLogin will remain null (will show "First login")
         
-        // Save NEW current login time to localStorage
-        // This will become the "last login" on the NEXT login
-        localStorage.setItem('adminCurrentLogin', newLoginTime.toString());
+        // STEP 5: Save NEW login timestamp as the "last login" for NEXT session
+        // This ensures that on the next login, we'll know when this session started
+        localStorage.setItem('adminLastLoginTimestamp', newLoginTimestamp.toString());
         
-        // Save to login history
+        // STEP 6: Save to login history for reference
         const loginHistory = JSON.parse(localStorage.getItem('adminLoginHistory') || '[]');
         loginHistory.unshift({ 
           timestamp: newLoginTimeISO, 
-          date: new Date(newLoginTimeISO).toLocaleString() 
+          date: new Date(newLoginTimeISO).toLocaleString(),
+          timestamp_ms: newLoginTimestamp
         });
         localStorage.setItem('adminLoginHistory', JSON.stringify(loginHistory.slice(0, 10))); // Keep last 10 logins
         

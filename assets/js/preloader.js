@@ -1,6 +1,6 @@
 /**
  * Page Preloader Animation
- * Realistic ball bouncing with physics, revealing YASH in a straight line
+ * Cricket ball comes from left, drops and reveals YASH letters
  */
 
 (function() {
@@ -11,8 +11,9 @@
     <div id="page-preloader" class="page-preloader">
       <div class="preloader-content">
         <div class="ball" id="ball">
-          <div class="ball-highlight"></div>
-          <div class="ball-shadow"></div>
+          <div class="seam seam-1"></div>
+          <div class="seam seam-2"></div>
+          <div class="seam seam-3"></div>
         </div>
         <div class="name-text" id="nameText">
           <span class="letter" data-position="1">Y</span>
@@ -39,37 +40,30 @@
   // Realistic bounce physics
   function bounceBall(startX, startY, targetX, targetY, bounceCount, onComplete) {
     const gravity = 0.5;
-    const bounceDecay = 0.7; // Energy loss per bounce
+    const bounceDecay = 0.7;
     let currentX = startX;
     let currentY = startY;
     let velocityX = (targetX - startX) * 0.1;
     let velocityY = 0;
     let bounces = 0;
-    let lastBounceY = startY;
     
     const animate = () => {
-      // Apply gravity
       velocityY += gravity;
-      
-      // Update position
       currentX += velocityX;
       currentY += velocityY;
       
-      // Ground collision (bottom of screen)
       const groundY = window.innerHeight - 50;
       if (currentY >= groundY) {
         currentY = groundY;
-        velocityY *= -bounceDecay; // Bounce with energy loss
-        velocityX *= 0.95; // Slight friction
+        velocityY *= -bounceDecay;
+        velocityX *= 0.95;
         bounces++;
         
-        // Scale ball on bounce
         ball.style.transform = `translate(-50%, -50%) scale(0.9)`;
         setTimeout(() => {
           ball.style.transform = `translate(-50%, -50%) scale(1)`;
         }, 100);
         
-        // Check if we should stop bouncing
         if (bounces >= bounceCount || Math.abs(velocityY) < 0.5) {
           currentY = groundY;
           velocityY = 0;
@@ -78,11 +72,9 @@
         }
       }
       
-      // Update ball position
       ball.style.left = currentX + 'px';
       ball.style.top = currentY + 'px';
       
-      // Continue animation
       if (bounces < bounceCount && Math.abs(velocityY) > 0.1) {
         requestAnimationFrame(animate);
       } else if (onComplete) {
@@ -95,71 +87,77 @@
 
   // Animation timeline
   function startAnimation() {
-    const centerX = window.innerWidth / 2;
-    const startY = -50;
+    const positions = [
+      window.innerWidth * 0.25, // Y position
+      window.innerWidth * 0.4,  // a position
+      window.innerWidth * 0.6,  // s position
+      window.innerWidth * 0.75   // h position
+    ];
+    
+    const startX = -100;
+    const startY = window.innerHeight * 0.3;
     const groundY = window.innerHeight - 50;
     
-    // Phase 1: Ball falls from top with realistic physics
-    ball.style.left = centerX + 'px';
-    ball.style.top = startY + 'px';
-    ball.style.opacity = '1';
-    ball.style.transform = 'translate(-50%, -50%) scale(1)';
+    let letterIndex = 0;
+    let currentX = startX;
     
-    // Initial fall and bounce
-    setTimeout(() => {
-      bounceBall(centerX, startY, centerX, groundY, 3, () => {
-        // After initial bounce, move to positions
-        const positions = [
-          centerX - 150, // Y position
-          centerX - 50,  // a position
-          centerX + 50,  // s position
-          centerX + 150  // h position
-        ];
-        
-        let currentPos = centerX;
-        let letterIndex = 0;
-        
-        // Move ball to each position and reveal letter
-        function moveToNextPosition() {
-          if (letterIndex >= positions.length) {
-            // All letters revealed, fade out
+    function animateNextLetter() {
+      if (letterIndex >= positions.length) {
+        // All letters revealed, fade out
+        setTimeout(() => {
+          ball.style.opacity = '0';
+          ball.style.transition = 'opacity 0.5s ease-out';
+          
+          setTimeout(() => {
+            letters.forEach((letter, index) => {
+              setTimeout(() => {
+                letter.style.opacity = '0';
+              }, index * 100);
+            });
+            
             setTimeout(() => {
-              ball.style.opacity = '0';
-              ball.style.transition = 'opacity 0.5s ease-out';
+              preloader.style.opacity = '0';
+              preloader.style.transition = 'opacity 1s ease-out';
               
               setTimeout(() => {
-                letters.forEach((letter, index) => {
-                  setTimeout(() => {
-                    letter.style.opacity = '0';
-                  }, index * 100);
-                });
+                preloader.style.display = 'none';
+                mainContent.style.overflow = '';
                 
-                setTimeout(() => {
-                  preloader.style.opacity = '0';
-                  preloader.style.transition = 'opacity 1s ease-out';
-                  
-                  setTimeout(() => {
-                    preloader.style.display = 'none';
-                    mainContent.style.overflow = '';
-                    
-                    if (typeof AOS !== 'undefined') {
-                      AOS.init();
-                    }
-                  }, 1000);
-                }, 800);
-              }, 200);
-            }, 500);
-            return;
-          }
+                if (typeof AOS !== 'undefined') {
+                  AOS.init();
+                }
+              }, 1000);
+            }, 800);
+          }, 200);
+        }, 500);
+        return;
+      }
+      
+      const targetX = positions[letterIndex];
+      
+      // Ball comes from left and drops at target position
+      ball.style.left = currentX + 'px';
+      ball.style.top = startY + 'px';
+      ball.style.opacity = '1';
+      ball.style.transform = 'translate(-50%, -50%) scale(1)';
+      
+      // Move ball horizontally first, then drop
+      setTimeout(() => {
+        // Move to target X position
+        ball.style.left = targetX + 'px';
+        ball.style.transition = 'left 0.8s ease-in-out';
+        
+        // When ball reaches target X, drop it
+        setTimeout(() => {
+          ball.style.transition = 'none';
           
-          const targetX = positions[letterIndex];
-          
-          // Bounce to next position
-          bounceBall(currentPos, groundY, targetX, groundY, 2, () => {
-            // Reveal letter when ball reaches position
+          // Drop and bounce
+          bounceBall(targetX, startY, targetX, groundY, 2, () => {
+            // Reveal letter when ball stops bouncing
             const letter = letters[letterIndex];
             letter.style.opacity = '1';
             letter.style.transform = 'translate(-50%, -50%) scale(1)';
+            letter.style.left = targetX + 'px';
             
             // Small bounce effect on letter
             setTimeout(() => {
@@ -169,17 +167,18 @@
               }, 150);
             }, 100);
             
-            currentPos = targetX;
+            currentX = targetX;
             letterIndex++;
             
             // Move to next position
-            setTimeout(moveToNextPosition, 300);
+            setTimeout(animateNextLetter, 500);
           });
-        }
-        
-        moveToNextPosition();
-      });
-    }, 100);
+        }, 800);
+      }, 100);
+    }
+    
+    // Start animation
+    animateNextLetter();
   }
 
   // Start animation

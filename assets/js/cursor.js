@@ -1,7 +1,7 @@
 /**
  * Custom Cursor Effect
  * Inspired by https://azumbrunnen.me/
- * Creates a smooth following cursor effect that fills elements on hover
+ * Creates a smooth following cursor effect with colorful animations
  */
 
 (function() {
@@ -21,8 +21,6 @@
 
   let mouseX = 0;
   let mouseY = 0;
-  let cursorX = 0;
-  let cursorY = 0;
   let followerX = 0;
   let followerY = 0;
   let currentHoverElement = null;
@@ -33,104 +31,77 @@
   let targetX = 0;
   let targetY = 0;
   let isHovering = false;
-  let velocityX = 0;
-  let velocityY = 0;
-  let rotation = 0;
-  let targetRotation = 0;
+  let colorIndex = 0;
+  const colors = ['#ececec', '#4a9eff', '#ff6b6b', '#51cf66', '#ffd43b', '#ae3ec9', '#ff922b'];
 
-  // Update mouse position with velocity calculation
-  let lastMouseX = 0;
-  let lastMouseY = 0;
-  
+  // Update mouse position
   document.addEventListener('mousemove', (e) => {
     mouseX = e.clientX;
     mouseY = e.clientY;
     
-    // Calculate velocity for dynamic effects
-    const deltaX = mouseX - lastMouseX;
-    const deltaY = mouseY - lastMouseY;
-    const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+    // Update cursor immediately
+    cursor.style.left = mouseX + 'px';
+    cursor.style.top = mouseY + 'px';
     
-    velocityX = deltaX * 0.5;
-    velocityY = deltaY * 0.5;
-    
-    // Add slight rotation based on movement
-    if (distance > 0) {
-      targetRotation += distance * 0.1;
-    }
-    
-    lastMouseX = mouseX;
-    lastMouseY = mouseY;
-    
-    // Update cursor with slight delay for more dynamic feel
+    // Update target position for follower
     if (!isHovering) {
       targetX = mouseX;
       targetY = mouseY;
     }
+    
+    // Change color on movement for dynamic effect
+    const distance = Math.sqrt(Math.pow(mouseX - followerX, 2) + Math.pow(mouseY - followerY, 2));
+    if (distance > 50 && !isHovering) {
+      colorIndex = (colorIndex + 1) % colors.length;
+      updateCursorColor();
+    }
   });
 
-  // Smooth animation for follower with spring physics
+  // Update cursor colors
+  function updateCursorColor() {
+    const color = colors[colorIndex];
+    cursor.style.backgroundColor = color;
+    cursorFollower.style.borderColor = color;
+    cursorFollower.style.boxShadow = `0 0 20px ${color}40`;
+  }
+
+  // Smooth animation for follower
   function animateCursor() {
-    // Spring physics for smoother, more dynamic movement
-    const spring = 0.15;
-    const friction = 0.85;
-    
-    // Calculate distance and apply spring force
+    // Smooth cursor follower movement with easing
     const dx = targetX - followerX;
     const dy = targetY - followerY;
+    const distance = Math.sqrt(dx * dx + dy * dy);
     
-    // Apply spring physics
-    velocityX += dx * spring;
-    velocityY += dy * spring;
+    // Dynamic easing based on distance
+    const ease = distance > 100 ? 0.2 : 0.12;
     
-    // Apply friction
-    velocityX *= friction;
-    velocityY *= friction;
+    followerX += dx * ease;
+    followerY += dy * ease;
     
-    // Update position
-    followerX += velocityX;
-    followerY += velocityY;
+    // Smooth size transition
+    currentWidth += (targetWidth - currentWidth) * 0.2;
+    currentHeight += (targetHeight - currentHeight) * 0.2;
     
-    // Smooth size transition with easing
-    const sizeDiffX = targetWidth - currentWidth;
-    const sizeDiffY = targetHeight - currentHeight;
-    currentWidth += sizeDiffX * 0.25;
-    currentHeight += sizeDiffY * 0.25;
-    
-    // Smooth rotation
-    rotation += (targetRotation - rotation) * 0.1;
-    
-    // Apply transformations
     cursorFollower.style.left = followerX + 'px';
     cursorFollower.style.top = followerY + 'px';
     cursorFollower.style.width = currentWidth + 'px';
     cursorFollower.style.height = currentHeight + 'px';
-    cursorFollower.style.borderRadius = isHovering ? '8px' : '50%';
+    cursorFollower.style.borderRadius = isHovering ? '12px' : '50%';
     
-    // Add subtle rotation for dynamic feel
-    if (!isHovering && Math.abs(velocityX) > 0.1 || Math.abs(velocityY) > 0.1) {
-      cursorFollower.style.transform = `translate(-50%, -50%) rotate(${rotation * 0.1}deg)`;
+    // Add subtle scale animation based on movement
+    if (!isHovering) {
+      const scale = 1 + Math.min(distance * 0.001, 0.2);
+      cursorFollower.style.transform = `translate(-50%, -50%) scale(${scale})`;
     } else {
       cursorFollower.style.transform = 'translate(-50%, -50%)';
     }
-    
-    // Update cursor position with slight delay for trailing effect
-    cursorX += (mouseX - cursorX) * 0.3;
-    cursorY += (mouseY - cursorY) * 0.3;
-    
-    cursor.style.left = cursorX + 'px';
-    cursor.style.top = cursorY + 'px';
-    
-    // Add subtle scale based on velocity for dynamic feel
-    const velocity = Math.sqrt(velocityX * velocityX + velocityY * velocityY);
-    const scale = 1 + Math.min(velocity * 0.01, 0.3);
-    cursor.style.transform = `translate(-50%, -50%) scale(${scale})`;
     
     requestAnimationFrame(animateCursor);
   }
 
   // Start animation
   animateCursor();
+  updateCursorColor();
 
   // Find the hoverable element (closest interactive element)
   function findHoverableElement(element) {
@@ -147,7 +118,8 @@
     const interactiveClasses = [
       'btn', 'portfolio-wrap', 'service-card', 'scroll-top', 
       'portfolio-item', 'card-action', 'portfolio-links',
-      'navmenu', 'resume-item', 'skill-item', 'stat-card'
+      'navmenu', 'resume-item', 'skill-item', 'stat-card',
+      'portfolio-info', 'service-icon', 'contact-form'
     ];
     
     for (const className of interactiveClasses) {
@@ -178,7 +150,7 @@
       
       // Get element's bounding box
       const rect = hoverableElement.getBoundingClientRect();
-      const padding = 12; // Add some padding
+      const padding = 12;
       
       // Calculate target size and position
       targetWidth = rect.width + (padding * 2);
@@ -186,17 +158,17 @@
       targetX = rect.left + (rect.width / 2);
       targetY = rect.top + (rect.height / 2);
       
-      // Reset velocity for smooth transition
-      velocityX = 0;
-      velocityY = 0;
+      // Change to a vibrant color when hovering
+      const hoverColor = colors[Math.floor(Math.random() * (colors.length - 1)) + 1];
+      cursor.style.backgroundColor = hoverColor;
+      cursorFollower.style.borderColor = hoverColor;
+      cursorFollower.style.backgroundColor = hoverColor + '20';
+      cursorFollower.style.boxShadow = `0 0 30px ${hoverColor}60, inset 0 0 20px ${hoverColor}20`;
       
-      // Add hover class with animation
+      // Add hover class
       cursor.classList.add('hover');
       cursorFollower.classList.add('hover');
       cursorFollower.setAttribute('data-filling', 'true');
-      
-      // Add pulse effect
-      cursorFollower.style.transition = 'background-color 0.3s ease-out, border-color 0.3s ease-out';
     }
   });
 
@@ -211,59 +183,42 @@
         currentHoverElement = null;
         isHovering = false;
         
-        // Reset to normal size with smooth transition
+        // Reset to normal size
         targetWidth = 40;
         targetHeight = 40;
         targetX = mouseX;
         targetY = mouseY;
         
+        // Reset colors
+        updateCursorColor();
+        cursorFollower.style.backgroundColor = 'transparent';
+        
         // Remove hover class
         cursor.classList.remove('hover');
         cursorFollower.classList.remove('hover');
         cursorFollower.removeAttribute('data-filling');
-        
-        // Reset rotation
-        targetRotation = rotation;
       }
     }
   });
 
-  // Click effect with bounce animation
+  // Click effect with color change
   document.addEventListener('mousedown', () => {
-    cursor.style.transition = 'transform 0.1s cubic-bezier(0.68, -0.55, 0.265, 1.55)';
-    cursor.style.transform = 'translate(-50%, -50%) scale(0.7)';
+    cursor.style.transform = 'translate(-50%, -50%) scale(0.6)';
+    const clickColor = colors[Math.floor(Math.random() * colors.length)];
+    cursor.style.backgroundColor = clickColor;
     
     if (!isHovering) {
-      cursorFollower.style.transition = 'transform 0.15s cubic-bezier(0.68, -0.55, 0.265, 1.55)';
-      cursorFollower.style.transform = 'translate(-50%, -50%) scale(0.85)';
-    } else {
-      // Slight shrink when clicking on filled element
-      cursorFollower.style.transition = 'transform 0.1s ease-out';
-      cursorFollower.style.transform = 'translate(-50%, -50%) scale(0.95)';
+      cursorFollower.style.transform = 'translate(-50%, -50%) scale(0.8)';
+      cursorFollower.style.borderColor = clickColor;
     }
   });
 
   document.addEventListener('mouseup', () => {
-    cursor.style.transition = 'transform 0.2s cubic-bezier(0.68, -0.55, 0.265, 1.55)';
-    cursor.style.transform = 'translate(-50%, -50%) scale(1.1)';
-    
-    // Bounce back effect
-    setTimeout(() => {
-      cursor.style.transition = 'transform 0.15s ease-out';
-      cursor.style.transform = 'translate(-50%, -50%) scale(1)';
-    }, 100);
+    cursor.style.transform = 'translate(-50%, -50%) scale(1)';
+    updateCursorColor();
     
     if (!isHovering) {
-      cursorFollower.style.transition = 'transform 0.2s cubic-bezier(0.68, -0.55, 0.265, 1.55)';
-      cursorFollower.style.transform = 'translate(-50%, -50%) scale(1.05)';
-      
-      setTimeout(() => {
-        cursorFollower.style.transition = 'transform 0.15s ease-out';
-        cursorFollower.style.transform = 'translate(-50%, -50%)';
-      }, 100);
-    } else {
-      cursorFollower.style.transition = 'transform 0.15s ease-out';
-      cursorFollower.style.transform = 'translate(-50%, -50%)';
+      cursorFollower.style.transform = 'translate(-50%, -50%) scale(1)';
     }
   });
 
@@ -277,6 +232,14 @@
     cursor.style.opacity = '1';
     cursorFollower.style.opacity = '1';
   });
+
+  // Auto-rotate colors periodically
+  setInterval(() => {
+    if (!isHovering) {
+      colorIndex = (colorIndex + 1) % colors.length;
+      updateCursorColor();
+    }
+  }, 3000);
 
   // Handle window resize
   let resizeTimer;
@@ -302,6 +265,8 @@
         cursor.classList.remove('hover');
         cursorFollower.classList.remove('hover');
         cursorFollower.removeAttribute('data-filling');
+        updateCursorColor();
+        cursorFollower.style.backgroundColor = 'transparent';
       }
     }, 250);
   });

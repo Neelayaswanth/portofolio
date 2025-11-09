@@ -51,48 +51,39 @@
   // Start animation
   animateCursor();
 
-  // Hover effects on interactive elements
-  function setupHoverEffects() {
-    const interactiveSelectors = [
-      'a', 'button', '.btn', 'input', 'textarea', 'select', 
-      '[role="button"]', '.portfolio-wrap', '.service-card', 
-      '.navmenu a', '.scroll-top', '.portfolio-item', 
-      '.card-action', '.contact-form input', '.contact-form textarea',
-      '.contact-form button', '.php-email-form input', 
-      '.php-email-form textarea', '.php-email-form button'
-    ];
-
-    interactiveSelectors.forEach(selector => {
-      const elements = document.querySelectorAll(selector);
-      elements.forEach(element => {
-        element.addEventListener('mouseenter', () => {
-          cursor.classList.add('hover');
-          cursorFollower.classList.add('hover');
-        });
-
-        element.addEventListener('mouseleave', () => {
-          cursor.classList.remove('hover');
-          cursorFollower.classList.remove('hover');
-        });
-      });
-    });
+  // Hover effects on interactive elements using event delegation
+  function isInteractiveElement(element) {
+    if (!element) return false;
+    
+    const tagName = element.tagName.toLowerCase();
+    const interactiveTags = ['a', 'button', 'input', 'textarea', 'select'];
+    
+    if (interactiveTags.includes(tagName)) return true;
+    if (element.hasAttribute('role') && element.getAttribute('role') === 'button') return true;
+    if (element.classList.contains('btn')) return true;
+    if (element.classList.contains('portfolio-wrap')) return true;
+    if (element.classList.contains('service-card')) return true;
+    if (element.classList.contains('scroll-top')) return true;
+    if (element.classList.contains('portfolio-item')) return true;
+    if (element.classList.contains('card-action')) return true;
+    if (element.closest('.navmenu')) return true;
+    
+    return false;
   }
 
-  // Setup hover effects when DOM is ready
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', setupHoverEffects);
-  } else {
-    setupHoverEffects();
-  }
-
-  // Also setup for dynamically added elements
-  const observer = new MutationObserver(() => {
-    setupHoverEffects();
+  // Use event delegation for better performance
+  document.addEventListener('mouseover', (e) => {
+    if (isInteractiveElement(e.target) || isInteractiveElement(e.target.closest('a, button, .btn'))) {
+      cursor.classList.add('hover');
+      cursorFollower.classList.add('hover');
+    }
   });
 
-  observer.observe(document.body, {
-    childList: true,
-    subtree: true
+  document.addEventListener('mouseout', (e) => {
+    if (isInteractiveElement(e.target) || isInteractiveElement(e.target.closest('a, button, .btn'))) {
+      cursor.classList.remove('hover');
+      cursorFollower.classList.remove('hover');
+    }
   });
 
   // Click effect

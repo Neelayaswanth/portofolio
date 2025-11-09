@@ -2568,8 +2568,29 @@ section,
   background-color: #ececec;
   transform: translate(-50%, -50%);
   will-change: transform;
-  transition: background-color 0.3s ease, transform 0.2s ease;
+  transition: background-color 0.3s ease, 
+              transform 0.2s ease,
+              width 0.2s ease,
+              height 0.2s ease,
+              border-radius 0.2s ease;
   border-radius: 50%;
+}
+
+.custom-cursor.text-cursor {
+  width: 2px;
+  height: 20px;
+  background-color: #ff922b;
+  border-radius: 1px;
+  animation: textCursorBlink 1s infinite;
+}
+
+@keyframes textCursorBlink {
+  0%, 50% {
+    opacity: 1;
+  }
+  51%, 100% {
+    opacity: 0.3;
+  }
 }
 
 .custom-cursor-follower {

@@ -176,8 +176,21 @@
       cursorFollower.classList.add('hover');
       if (isText) {
         cursorFollower.classList.add('text-hover');
+        cursor.classList.add('text-cursor');
+        // Hide follower, show text cursor
+        cursorFollower.style.opacity = '0';
+        cursor.style.width = '2px';
+        cursor.style.height = '20px';
+        cursor.style.borderRadius = '1px';
+        cursor.style.backgroundColor = hoverColor;
       } else {
         cursorFollower.classList.remove('text-hover');
+        cursor.classList.remove('text-cursor');
+        cursorFollower.style.opacity = '1';
+        cursor.style.width = '8px';
+        cursor.style.height = '8px';
+        cursor.style.borderRadius = '50%';
+        cursor.style.backgroundColor = defaultColor;
       }
       cursorFollower.setAttribute('data-filling', 'true');
     }
@@ -205,9 +218,17 @@
         
         // Remove hover class
         cursor.classList.remove('hover');
+        cursor.classList.remove('text-cursor');
         cursorFollower.classList.remove('hover');
         cursorFollower.classList.remove('text-hover');
         cursorFollower.removeAttribute('data-filling');
+        
+        // Reset cursor to normal
+        cursorFollower.style.opacity = '1';
+        cursor.style.width = '8px';
+        cursor.style.height = '8px';
+        cursor.style.borderRadius = '50%';
+        cursor.style.backgroundColor = defaultColor;
       }
     }
   });
@@ -260,10 +281,18 @@
         targetX = mouseX;
         targetY = mouseY;
         cursor.classList.remove('hover');
+        cursor.classList.remove('text-cursor');
         cursorFollower.classList.remove('hover');
         cursorFollower.classList.remove('text-hover');
         cursorFollower.removeAttribute('data-filling');
         cursorFollower.style.borderColor = defaultColor;
+        
+        // Reset cursor to normal
+        cursorFollower.style.opacity = '1';
+        cursor.style.width = '8px';
+        cursor.style.height = '8px';
+        cursor.style.borderRadius = '50%';
+        cursor.style.backgroundColor = defaultColor;
       }
     }, 250);
   });

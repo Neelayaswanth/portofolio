@@ -331,22 +331,64 @@
 
     // Update admin login times display
     function updateAdminLoginTimes() {
-      // Current login time
+      // Current login time (from sessionStorage - this session)
       const currentLoginTime = sessionStorage.getItem('adminLoginTime');
+      let currentLoginDate = null;
       if (currentLoginTime) {
-        const loginDate = new Date(parseInt(currentLoginTime));
-        document.getElementById('current-login-time').textContent = loginDate.toLocaleString();
+        currentLoginDate = new Date(parseInt(currentLoginTime));
+        document.getElementById('current-login-time').textContent = currentLoginDate.toLocaleString();
       } else {
         document.getElementById('current-login-time').textContent = 'Just now';
       }
       
-      // Last login time (from localStorage)
+      // Last login time (from localStorage - previous session)
       const lastLogin = localStorage.getItem('adminLastLogin');
+      const currentLoginInStorage = localStorage.getItem('adminCurrentLogin');
+      
       if (lastLogin) {
         const lastLoginDate = new Date(lastLogin);
-        document.getElementById('last-login-time').textContent = lastLoginDate.toLocaleString();
+        const lastLoginTimeValue = lastLoginDate.getTime();
+        const currentLoginTimeValue = currentLoginDate ? currentLoginDate.getTime() : 0;
+        
+        // Verify that last login is actually different from current login
+        // They should be at least 1 second apart
+        if (Math.abs(lastLoginTimeValue - currentLoginTimeValue) > 1000) {
+          document.getElementById('last-login-time').textContent = lastLoginDate.toLocaleString();
+        } else {
+          // If they're the same, this might be the first login
+          // Check login history for a previous login
+          const loginHistory = JSON.parse(localStorage.getItem('adminLoginHistory') || '[]');
+          if (loginHistory.length > 1) {
+            // Get the second entry (previous login)
+            const previousLogin = loginHistory[1];
+            if (previousLogin && previousLogin.timestamp) {
+              const prevDate = new Date(previousLogin.timestamp);
+              if (Math.abs(prevDate.getTime() - currentLoginTimeValue) > 1000) {
+                document.getElementById('last-login-time').textContent = previousLogin.date || prevDate.toLocaleString();
+              } else {
+                document.getElementById('last-login-time').textContent = 'First login';
+              }
+            } else {
+              document.getElementById('last-login-time').textContent = 'First login';
+            }
+          } else {
+            document.getElementById('last-login-time').textContent = 'First login';
+          }
+        }
       } else {
-        document.getElementById('last-login-time').textContent = 'First login';
+        // No last login stored - check if this is truly first login
+        const loginHistory = JSON.parse(localStorage.getItem('adminLoginHistory') || '[]');
+        if (loginHistory.length <= 1) {
+          document.getElementById('last-login-time').textContent = 'First login';
+        } else {
+          // There's history but no last login - use second entry
+          const previousLogin = loginHistory[1];
+          if (previousLogin && previousLogin.timestamp) {
+            document.getElementById('last-login-time').textContent = previousLogin.date || new Date(previousLogin.timestamp).toLocaleString();
+          } else {
+            document.getElementById('last-login-time').textContent = 'First login';
+          }
+        }
       }
     }
 
@@ -364,17 +406,40 @@
       
       // Validate credentials
       if (username === ADMIN_CREDENTIALS.username && password === ADMIN_CREDENTIALS.password) {
-        // Set authentication in sessionStorage
-        const loginTime = new Date().toISOString();
-        sessionStorage.setItem('adminAuthenticated', 'true');
-        sessionStorage.setItem('adminLoginTime', Date.now().toString());
+        // IMPORTANT: Get the PREVIOUS login time FIRST (before updating)
+        // This is the time that should be shown as "last login"
+        const previousLoginTime = localStorage.getItem('adminCurrentLogin');
         
-        // Save last login time to localStorage (persists across sessions)
-        localStorage.setItem('adminLastLogin', loginTime);
-        localStorage.setItem('adminLoginHistory', JSON.stringify([
-          ...(JSON.parse(localStorage.getItem('adminLoginHistory') || '[]')),
-          { timestamp: loginTime, date: new Date(loginTime).toLocaleString() }
-        ].slice(-10))); // Keep last 10 logins
+        // Set NEW current login time
+        const newLoginTime = Date.now();
+        const newLoginTimeISO = new Date().toISOString();
+        
+        // Set authentication in sessionStorage
+        sessionStorage.setItem('adminAuthenticated', 'true');
+        sessionStorage.setItem('adminLoginTime', newLoginTime.toString());
+        
+        // If there was a previous login, save it as "last login"
+        // Only do this if previousLoginTime exists and is different from current
+        if (previousLoginTime) {
+          const previousTime = parseInt(previousLoginTime);
+          // Make sure it's actually a previous login (at least 1 second ago)
+          if (newLoginTime - previousTime > 1000) {
+            const previousLoginDate = new Date(previousTime);
+            localStorage.setItem('adminLastLogin', previousLoginDate.toISOString());
+          }
+        }
+        
+        // Save NEW current login time to localStorage
+        // This will become the "last login" on the NEXT login
+        localStorage.setItem('adminCurrentLogin', newLoginTime.toString());
+        
+        // Save to login history
+        const loginHistory = JSON.parse(localStorage.getItem('adminLoginHistory') || '[]');
+        loginHistory.unshift({ 
+          timestamp: newLoginTimeISO, 
+          date: new Date(newLoginTimeISO).toLocaleString() 
+        });
+        localStorage.setItem('adminLoginHistory', JSON.stringify(loginHistory.slice(0, 10))); // Keep last 10 logins
         
         // Show dashboard
         showDashboard();

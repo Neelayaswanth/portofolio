@@ -23,10 +23,10 @@
   let followerX = 0;
   let followerY = 0;
   let currentHoverElement = null;
-  let targetWidth = 40;
-  let targetHeight = 40;
-  let currentWidth = 40;
-  let currentHeight = 40;
+  let targetWidth = 30;
+  let targetHeight = 30;
+  let currentWidth = 30;
+  let currentHeight = 30;
   let targetX = 0;
   let targetY = 0;
   let isHovering = false;
@@ -251,8 +251,8 @@
     // Reset text mode
     isTextMode = false;
     cursor.classList.remove('text-cursor');
-    cursor.style.height = '8px';
-    cursor.style.width = '8px';
+      cursor.style.height = '5px';
+      cursor.style.width = '5px';
     cursor.style.borderRadius = '50%';
     cursor.style.backgroundColor = defaultColor;
     cursorFollower.style.opacity = '1';
@@ -295,8 +295,8 @@
       if (!relatedTarget || !isTextElement(relatedTarget)) {
         isTextMode = false;
         cursor.classList.remove('text-cursor');
-        cursor.style.height = '8px';
-        cursor.style.width = '8px';
+      cursor.style.height = '5px';
+      cursor.style.width = '5px';
         cursor.style.borderRadius = '50%';
         cursor.style.backgroundColor = defaultColor;
         cursorFollower.style.opacity = '1';
@@ -314,8 +314,8 @@
         isHovering = false;
         
         // Reset to normal size
-        targetWidth = 40;
-        targetHeight = 40;
+        targetWidth = 30;
+        targetHeight = 30;
         targetX = mouseX;
         targetY = mouseY;
         
@@ -392,8 +392,8 @@
       if (isTextMode) {
         isTextMode = false;
         cursor.classList.remove('text-cursor');
-        cursor.style.height = '8px';
-        cursor.style.width = '8px';
+      cursor.style.height = '5px';
+      cursor.style.width = '5px';
         cursor.style.borderRadius = '50%';
         cursor.style.backgroundColor = defaultColor;
         cursorFollower.style.opacity = '1';

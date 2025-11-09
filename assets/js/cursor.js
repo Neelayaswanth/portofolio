@@ -1,6 +1,7 @@
 /**
  * Custom Cursor Effect
- * Simple round cursor, box cursor for interactive elements, text cursor for words
+ * Inspired by https://azumbrunnen.me/
+ * Creates a smooth following cursor effect that fills elements on hover
  */
 
 (function() {
@@ -31,16 +32,18 @@
   let targetY = 0;
   let isHovering = false;
   const defaultColor = '#ececec';
-  const hoverColor = '#ff922b';
+  const hoverColor = '#ff922b'; // Orange
 
   // Update mouse position
   document.addEventListener('mousemove', (e) => {
     mouseX = e.clientX;
     mouseY = e.clientY;
     
+    // Update cursor immediately
     cursor.style.left = mouseX + 'px';
     cursor.style.top = mouseY + 'px';
     
+    // Update target position for follower
     if (!isHovering) {
       targetX = mouseX;
       targetY = mouseY;
@@ -49,14 +52,18 @@
 
   // Smooth animation for follower
   function animateCursor() {
+    // Smooth cursor follower movement with easing
     const dx = targetX - followerX;
     const dy = targetY - followerY;
     const distance = Math.sqrt(dx * dx + dy * dy);
+    
+    // Dynamic easing based on distance
     const ease = distance > 100 ? 0.2 : 0.12;
     
     followerX += dx * ease;
     followerY += dy * ease;
     
+    // Smooth size transition
     currentWidth += (targetWidth - currentWidth) * 0.2;
     currentHeight += (targetHeight - currentHeight) * 0.2;
     
@@ -69,65 +76,21 @@
     requestAnimationFrame(animateCursor);
   }
 
+  // Start animation
   animateCursor();
 
-  // Check if element is interactive
-  function isInteractiveElement(element) {
-    if (!element) return false;
-    
-    const tagName = element.tagName.toLowerCase();
-    if (['a', 'button', 'input', 'textarea', 'select'].includes(tagName)) return true;
-    if (element.hasAttribute('role') && element.getAttribute('role') === 'button') return true;
-    
-    const interactiveClasses = [
-      'btn', 'portfolio-wrap', 'service-card', 'scroll-top', 
-      'portfolio-item', 'card-action', 'portfolio-links',
-      'navmenu', 'resume-item', 'skill-item', 'stat-card',
-      'portfolio-info', 'service-icon', 'contact-form'
-    ];
-    
-    for (const className of interactiveClasses) {
-      if (element.classList.contains(className)) return true;
-      if (element.closest('.' + className)) return true;
-    }
-    
-    if (element.closest('a, button, .btn')) return true;
-    
-    return false;
-  }
-
-  // Check if element is text
-  function isTextElement(element) {
-    if (!element) return false;
-    if (isInteractiveElement(element)) return false;
-    
-    const textTags = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'span', 'li', 'td', 'th', 'label', 'strong', 'em', 'b', 'i'];
-    const tagName = element.tagName.toLowerCase();
-    
-    if (textTags.includes(tagName)) return true;
-    
-    const hasText = element.textContent && element.textContent.trim().length > 0;
-    const isInteractive = ['a', 'button', 'input', 'textarea', 'select'].includes(tagName);
-    
-    if (hasText && !isInteractive) {
-      const parent = element.parentElement;
-      if (parent && textTags.includes(parent.tagName.toLowerCase())) {
-        return true;
-      }
-    }
-    
-    return false;
-  }
-
-  // Find hoverable element
+  // Find the hoverable element (closest interactive element)
   function findHoverableElement(element) {
     if (!element) return null;
     
-    if (isInteractiveElement(element)) return element;
+    // Check if element itself is interactive
+    const tagName = element.tagName.toLowerCase();
+    const interactiveTags = ['a', 'button', 'input', 'textarea', 'select'];
     
-    const interactiveParent = element.closest('a, button, .btn, [role="button"]');
-    if (interactiveParent) return interactiveParent;
+    if (interactiveTags.includes(tagName)) return element;
+    if (element.hasAttribute('role') && element.getAttribute('role') === 'button') return element;
     
+    // Check for interactive classes
     const interactiveClasses = [
       'btn', 'portfolio-wrap', 'service-card', 'scroll-top', 
       'portfolio-item', 'card-action', 'portfolio-links',
@@ -136,20 +99,24 @@
     ];
     
     for (const className of interactiveClasses) {
+      if (element.classList.contains(className)) return element;
       const parent = element.closest('.' + className);
       if (parent) return parent;
     }
     
+    // Check for links and buttons in parent
+    const linkOrButton = element.closest('a, button, .btn');
+    if (linkOrButton) return linkOrButton;
+    
+    // Check navigation menu
     if (element.closest('.navmenu')) {
       return element.closest('.navmenu a') || element.closest('.navmenu');
     }
     
-    if (isTextElement(element)) return element;
-    
     return null;
   }
 
-  // Handle mouseover
+  // Handle mouseover - expand cursor to fill element
   document.addEventListener('mouseover', (e) => {
     const hoverableElement = findHoverableElement(e.target);
     
@@ -157,69 +124,50 @@
       currentHoverElement = hoverableElement;
       isHovering = true;
       
+      // Get element's bounding box
       const rect = hoverableElement.getBoundingClientRect();
-      const isText = isTextElement(hoverableElement);
+      const padding = 12;
       
-      if (isText) {
-        // Text cursor
-        const computedStyle = window.getComputedStyle(hoverableElement);
-        const fontSize = parseFloat(computedStyle.fontSize);
-        const cursorHeight = Math.max(fontSize * 1.2, 16);
-        
-        cursorFollower.style.opacity = '0';
-        cursor.classList.add('text-cursor');
-        cursor.style.width = '2px';
-        cursor.style.height = cursorHeight + 'px';
-        cursor.style.borderRadius = '1px';
-        cursor.style.backgroundColor = hoverColor;
-      } else {
-        // Box cursor for interactive elements
-        const padding = 12;
-        targetWidth = rect.width + (padding * 2);
-        targetHeight = rect.height + (padding * 2);
-        targetX = rect.left + (rect.width / 2);
-        targetY = rect.top + (rect.height / 2);
-        
-        cursorFollower.style.borderColor = hoverColor;
-        cursorFollower.style.opacity = '1';
-        cursorFollower.classList.add('no-glass');
-        
-        cursor.classList.remove('text-cursor');
-        cursor.style.width = '6px';
-        cursor.style.height = '6px';
-        cursor.style.borderRadius = '50%';
-        cursor.style.backgroundColor = defaultColor;
-        
-        cursorFollower.setAttribute('data-filling', 'true');
-      }
+      // Calculate target size and position
+      targetWidth = rect.width + (padding * 2);
+      targetHeight = rect.height + (padding * 2);
+      targetX = rect.left + (rect.width / 2);
+      targetY = rect.top + (rect.height / 2);
+      
+      // Change to orange border only when hovering (no fill)
+      cursorFollower.style.borderColor = hoverColor;
+      
+      // Add hover class
+      cursor.classList.add('hover');
+      cursorFollower.classList.add('hover');
+      cursorFollower.setAttribute('data-filling', 'true');
     }
   });
 
-  // Handle mouseout
+  // Handle mouseout - shrink cursor back
   document.addEventListener('mouseout', (e) => {
     const hoverableElement = findHoverableElement(e.target);
     
     if (hoverableElement === currentHoverElement) {
+      // Check if we're actually leaving the element
       const relatedTarget = e.relatedTarget;
       if (!relatedTarget || !hoverableElement.contains(relatedTarget)) {
         currentHoverElement = null;
         isHovering = false;
         
+        // Reset to normal size
         targetWidth = 40;
         targetHeight = 40;
         targetX = mouseX;
         targetY = mouseY;
         
+        // Reset to default color (border only)
         cursorFollower.style.borderColor = defaultColor;
-        cursorFollower.style.opacity = '1';
-        cursorFollower.classList.remove('no-glass');
-        cursorFollower.removeAttribute('data-filling');
         
-        cursor.classList.remove('text-cursor');
-        cursor.style.width = '6px';
-        cursor.style.height = '6px';
-        cursor.style.borderRadius = '50%';
-        cursor.style.backgroundColor = defaultColor;
+        // Remove hover class
+        cursor.classList.remove('hover');
+        cursorFollower.classList.remove('hover');
+        cursorFollower.removeAttribute('data-filling');
       }
     }
   });
@@ -239,7 +187,7 @@
     }
   });
 
-  // Hide/show cursor
+  // Hide cursor when mouse leaves window
   document.addEventListener('mouseleave', () => {
     cursor.style.opacity = '0';
     cursorFollower.style.opacity = '0';
@@ -263,6 +211,7 @@
         cursorFollower.style.display = 'block';
       }
       
+      // Reset hover state on resize
       if (isHovering) {
         currentHoverElement = null;
         isHovering = false;
@@ -270,15 +219,10 @@
         targetHeight = 40;
         targetX = mouseX;
         targetY = mouseY;
-        cursorFollower.style.borderColor = defaultColor;
-        cursorFollower.style.opacity = '1';
-        cursorFollower.classList.remove('no-glass');
+        cursor.classList.remove('hover');
+        cursorFollower.classList.remove('hover');
         cursorFollower.removeAttribute('data-filling');
-        cursor.classList.remove('text-cursor');
-        cursor.style.width = '6px';
-        cursor.style.height = '6px';
-        cursor.style.borderRadius = '50%';
-        cursor.style.backgroundColor = defaultColor;
+        cursorFollower.style.borderColor = defaultColor;
       }
     }, 250);
   });

@@ -425,12 +425,27 @@
   }
 
   // Handle scroll - update cursor border shape
-  let scrollTimer;
+  let scrollUpdatePending = false;
   window.addEventListener('scroll', () => {
-    if (isHovering && currentHoverElement) {
-      updateCursorBorder();
+    if (isHovering && currentHoverElement && !scrollUpdatePending) {
+      scrollUpdatePending = true;
+      requestAnimationFrame(() => {
+        updateCursorBorder();
+        scrollUpdatePending = false;
+      });
     }
   }, { passive: true });
+  
+  // Also listen to scroll on all scrollable containers
+  document.addEventListener('scroll', (e) => {
+    if (isHovering && currentHoverElement && !scrollUpdatePending) {
+      scrollUpdatePending = true;
+      requestAnimationFrame(() => {
+        updateCursorBorder();
+        scrollUpdatePending = false;
+      });
+    }
+  }, { passive: true, capture: true });
 
   // Update cursor border continuously while hovering (in animation loop)
   // This is already handled in the animateCursor function and scroll event

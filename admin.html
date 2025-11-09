@@ -12,7 +12,66 @@
       background-color: #1f1f1f;
       color: #ffffff;
       padding: 20px;
+      min-height: 100vh;
     }
+    
+    /* Login Page Styles */
+    #login-container {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: -20px;
+    }
+    
+    .login-card {
+      background: linear-gradient(135deg, #232323 0%, #2c2c2c 100%);
+      border-radius: 15px;
+      padding: 40px;
+      width: 100%;
+      max-width: 400px;
+      border: 1px solid rgba(236, 236, 236, 0.1);
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+    }
+    
+    .login-card h2 {
+      color: #ff922b;
+      margin-bottom: 30px;
+      text-align: center;
+    }
+    
+    .login-card .form-control {
+      background-color: #1f1f1f;
+      border: 1px solid rgba(236, 236, 236, 0.2);
+      color: #ffffff;
+      padding: 12px;
+      margin-bottom: 20px;
+    }
+    
+    .login-card .form-control:focus {
+      background-color: #1f1f1f;
+      border-color: #ff922b;
+      color: #ffffff;
+      box-shadow: 0 0 0 0.2rem rgba(255, 146, 43, 0.25);
+    }
+    
+    .login-card .btn-primary {
+      background-color: #ff922b;
+      border-color: #ff922b;
+      width: 100%;
+      padding: 12px;
+      font-weight: 600;
+    }
+    
+    .login-card .btn-primary:hover {
+      background-color: #e67e22;
+      border-color: #e67e22;
+    }
+    
+    .login-card .alert {
+      margin-top: 15px;
+    }
+    
     .stat-card {
       background: linear-gradient(135deg, #232323 0%, #2c2c2c 100%);
       border-radius: 10px;
@@ -35,65 +94,102 @@
     .refresh-btn {
       margin-bottom: 20px;
     }
+    
+    #dashboard-container {
+      display: none;
+    }
+    
+    .logout-btn {
+      float: right;
+      margin-top: -50px;
+    }
   </style>
 </head>
 <body>
-  <div class="container">
-    <h1 class="mb-4">Portfolio Analytics Dashboard</h1>
-    
-    <div class="alert alert-info" id="connection-status" style="display: none;">
-      <i class="bi bi-info-circle"></i> <span id="status-message"></span>
+  <!-- Login Container -->
+  <div id="login-container">
+    <div class="login-card">
+      <h2><i class="bi bi-shield-lock"></i> Admin Login</h2>
+      <form id="login-form">
+        <div class="mb-3">
+          <label for="username" class="form-label">Username</label>
+          <input type="text" class="form-control" id="username" required autocomplete="username">
+        </div>
+        <div class="mb-3">
+          <label for="password" class="form-label">Password</label>
+          <input type="password" class="form-control" id="password" required autocomplete="current-password">
+        </div>
+        <div id="login-error" class="alert alert-danger" style="display: none;"></div>
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-box-arrow-in-right"></i> Login
+        </button>
+      </form>
     </div>
-    
-    <button class="btn btn-primary refresh-btn" onclick="loadAnalytics()">
-      <i class="bi bi-arrow-clockwise"></i> Refresh Data
-    </button>
+  </div>
 
-    <div class="row" id="stats-container">
-      <div class="col-md-4">
-        <div class="stat-card">
-          <div class="stat-number" id="total-views">-</div>
-          <div class="stat-label">Total Profile Views</div>
-        </div>
+  <!-- Dashboard Container -->
+  <div id="dashboard-container">
+    <div class="container">
+      <h1 class="mb-4">Portfolio Analytics Dashboard</h1>
+      
+      <button class="btn btn-secondary logout-btn" onclick="logout()">
+        <i class="bi bi-box-arrow-right"></i> Logout
+      </button>
+      
+      <div class="alert alert-info" id="connection-status" style="display: none;">
+        <i class="bi bi-info-circle"></i> <span id="status-message"></span>
       </div>
-      <div class="col-md-4">
-        <div class="stat-card">
-          <div class="stat-number" id="unique-visitors">-</div>
-          <div class="stat-label">Unique Visitors</div>
-        </div>
-      </div>
-      <div class="col-md-4">
-        <div class="stat-card">
-          <div class="stat-number" id="total-messages">-</div>
-          <div class="stat-label">Messages Received</div>
-        </div>
-      </div>
-    </div>
+      
+      <button class="btn btn-primary refresh-btn" onclick="loadAnalytics()">
+        <i class="bi bi-arrow-clockwise"></i> Refresh Data
+      </button>
 
-    <div class="row mt-4">
-      <div class="col-md-12">
-        <div class="stat-card">
-          <h3 class="mb-3">Recent Messages</h3>
-          <div class="table-responsive">
-            <table class="table table-dark table-hover">
-              <thead>
-                <tr>
-                  <th>ID</th>
-                  <th>Name</th>
-                  <th>Email</th>
-                  <th>Subject</th>
-                  <th>Message</th>
-                  <th>Date</th>
-                  <th>Status</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody id="messages-table">
-                <tr>
-                  <td colspan="8" class="text-center">Loading...</td>
-                </tr>
-              </tbody>
-            </table>
+      <div class="row" id="stats-container">
+        <div class="col-md-4">
+          <div class="stat-card">
+            <div class="stat-number" id="total-views">-</div>
+            <div class="stat-label">Total Profile Views</div>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="stat-card">
+            <div class="stat-number" id="unique-visitors">-</div>
+            <div class="stat-label">Unique Visitors</div>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="stat-card">
+            <div class="stat-number" id="total-messages">-</div>
+            <div class="stat-label">Messages Received</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="row mt-4">
+        <div class="col-md-12">
+          <div class="stat-card">
+            <h3 class="mb-3">Recent Messages</h3>
+            <div class="table-responsive">
+              <table class="table table-dark table-hover">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Subject</th>
+                    <th>Message</th>
+                    <th>Date</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="messages-table">
+                  <tr>
+                    <td colspan="8" class="text-center">Loading...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </div>
@@ -107,6 +203,98 @@
   <script src="assets/js/supabase-config.js"></script>
 
   <script>
+    // Authentication credentials
+    const ADMIN_CREDENTIALS = {
+      username: 'yash',
+      password: '1797365'
+    };
+
+    // Check if user is authenticated
+    function checkAuthentication() {
+      const isAuthenticated = sessionStorage.getItem('adminAuthenticated') === 'true';
+      if (isAuthenticated) {
+        showDashboard();
+      } else {
+        showLogin();
+      }
+    }
+
+    // Show login form
+    function showLogin() {
+      document.getElementById('login-container').style.display = 'flex';
+      document.getElementById('dashboard-container').style.display = 'none';
+      document.getElementById('username').focus();
+    }
+
+    // Show dashboard
+    function showDashboard() {
+      document.getElementById('login-container').style.display = 'none';
+      document.getElementById('dashboard-container').style.display = 'block';
+      // Load analytics when dashboard is shown
+      setTimeout(loadAnalytics, 500);
+    }
+
+    // Handle login form submission
+    document.getElementById('login-form').addEventListener('submit', function(e) {
+      e.preventDefault();
+      
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value;
+      const errorDiv = document.getElementById('login-error');
+      
+      // Clear previous error
+      errorDiv.style.display = 'none';
+      errorDiv.textContent = '';
+      
+      // Validate credentials
+      if (username === ADMIN_CREDENTIALS.username && password === ADMIN_CREDENTIALS.password) {
+        // Set authentication in sessionStorage
+        sessionStorage.setItem('adminAuthenticated', 'true');
+        sessionStorage.setItem('adminLoginTime', Date.now().toString());
+        
+        // Show dashboard
+        showDashboard();
+      } else {
+        // Show error
+        errorDiv.textContent = 'Invalid username or password. Please try again.';
+        errorDiv.style.display = 'block';
+        
+        // Clear password field
+        document.getElementById('password').value = '';
+        document.getElementById('password').focus();
+      }
+    });
+
+    // Logout function
+    function logout() {
+      if (confirm('Are you sure you want to logout?')) {
+        sessionStorage.removeItem('adminAuthenticated');
+        sessionStorage.removeItem('adminLoginTime');
+        showLogin();
+        
+        // Clear form
+        document.getElementById('login-form').reset();
+        document.getElementById('login-error').style.display = 'none';
+      }
+    }
+
+    // Check authentication on page load
+    document.addEventListener('DOMContentLoaded', function() {
+      checkAuthentication();
+      
+      // Auto-logout after 2 hours of inactivity (optional security feature)
+      const loginTime = sessionStorage.getItem('adminLoginTime');
+      if (loginTime) {
+        const twoHours = 2 * 60 * 60 * 1000; // 2 hours in milliseconds
+        const timeSinceLogin = Date.now() - parseInt(loginTime);
+        if (timeSinceLogin > twoHours) {
+          sessionStorage.removeItem('adminAuthenticated');
+          sessionStorage.removeItem('adminLoginTime');
+          showLogin();
+        }
+      }
+    });
+
     // Get Supabase client
     function getSupabaseClient() {
       if (window.SupabaseConfig && window.SupabaseConfig.client) {
@@ -132,6 +320,12 @@
     }
 
     async function loadAnalytics() {
+      // Check authentication before loading data
+      if (sessionStorage.getItem('adminAuthenticated') !== 'true') {
+        showLogin();
+        return;
+      }
+
       const tbody = document.getElementById('messages-table');
       const supabase = getSupabaseClient();
       
@@ -267,14 +461,12 @@
       }
     }
 
-    // Load data on page load
-    document.addEventListener('DOMContentLoaded', function() {
-      // Wait for Supabase to initialize
-      setTimeout(loadAnalytics, 500);
-    });
-
-    // Auto-refresh every 30 seconds
-    setInterval(loadAnalytics, 30000);
+    // Auto-refresh every 30 seconds (only if authenticated)
+    setInterval(() => {
+      if (sessionStorage.getItem('adminAuthenticated') === 'true') {
+        loadAnalytics();
+      }
+    }, 30000);
 
     // Show full message in modal
     function showMessageModal(messageId) {

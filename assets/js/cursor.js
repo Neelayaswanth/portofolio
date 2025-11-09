@@ -1,7 +1,6 @@
 /**
  * Custom Cursor Effect
- * Inspired by https://azumbrunnen.me/
- * Creates a smooth following cursor effect that fills elements on hover
+ * Simple round cursor, box cursor for interactive elements, text cursor for words
  */
 
 (function() {
@@ -32,18 +31,16 @@
   let targetY = 0;
   let isHovering = false;
   const defaultColor = '#ececec';
-  const hoverColor = '#ff922b'; // Orange
+  const hoverColor = '#ff922b';
 
   // Update mouse position
   document.addEventListener('mousemove', (e) => {
     mouseX = e.clientX;
     mouseY = e.clientY;
     
-    // Update cursor immediately
     cursor.style.left = mouseX + 'px';
     cursor.style.top = mouseY + 'px';
     
-    // Update target position for follower
     if (!isHovering) {
       targetX = mouseX;
       targetY = mouseY;
@@ -52,18 +49,14 @@
 
   // Smooth animation for follower
   function animateCursor() {
-    // Smooth cursor follower movement with easing
     const dx = targetX - followerX;
     const dy = targetY - followerY;
     const distance = Math.sqrt(dx * dx + dy * dy);
-    
-    // Dynamic easing based on distance
     const ease = distance > 100 ? 0.2 : 0.12;
     
     followerX += dx * ease;
     followerY += dy * ease;
     
-    // Smooth size transition
     currentWidth += (targetWidth - currentWidth) * 0.2;
     currentHeight += (targetHeight - currentHeight) * 0.2;
     
@@ -76,21 +69,16 @@
     requestAnimationFrame(animateCursor);
   }
 
-  // Start animation
   animateCursor();
 
-  // Check if element is interactive (should show box cursor)
+  // Check if element is interactive
   function isInteractiveElement(element) {
     if (!element) return false;
     
     const tagName = element.tagName.toLowerCase();
-    const interactiveTags = ['a', 'button', 'input', 'textarea', 'select'];
-    
-    // Direct interactive tags
-    if (interactiveTags.includes(tagName)) return true;
+    if (['a', 'button', 'input', 'textarea', 'select'].includes(tagName)) return true;
     if (element.hasAttribute('role') && element.getAttribute('role') === 'button') return true;
     
-    // Check for interactive classes
     const interactiveClasses = [
       'btn', 'portfolio-wrap', 'service-card', 'scroll-top', 
       'portfolio-item', 'card-action', 'portfolio-links',
@@ -103,32 +91,25 @@
       if (element.closest('.' + className)) return true;
     }
     
-    // Check if it's inside a button or link
     if (element.closest('a, button, .btn')) return true;
     
     return false;
   }
 
-  // Check if element is text content (and not interactive)
+  // Check if element is text
   function isTextElement(element) {
     if (!element) return false;
-    
-    // If it's interactive, it's not text
     if (isInteractiveElement(element)) return false;
     
     const textTags = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'span', 'li', 'td', 'th', 'label', 'strong', 'em', 'b', 'i'];
     const tagName = element.tagName.toLowerCase();
     
-    // Check if it's a text tag (but not 'a' which is interactive)
     if (textTags.includes(tagName)) return true;
     
-    // Check if it contains text and is not an interactive element
     const hasText = element.textContent && element.textContent.trim().length > 0;
     const isInteractive = ['a', 'button', 'input', 'textarea', 'select'].includes(tagName);
     
-    // If it has text and is not already an interactive element, treat as text
     if (hasText && !isInteractive) {
-      // Check if parent is a text container
       const parent = element.parentElement;
       if (parent && textTags.includes(parent.tagName.toLowerCase())) {
         return true;
@@ -138,22 +119,15 @@
     return false;
   }
 
-  // Find the hoverable element (prioritize interactive over text)
+  // Find hoverable element
   function findHoverableElement(element) {
     if (!element) return null;
     
-    // First check if it's interactive (buttons, links, etc.)
-    if (isInteractiveElement(element)) {
-      return element;
-    }
+    if (isInteractiveElement(element)) return element;
     
-    // Check for interactive elements in parent
     const interactiveParent = element.closest('a, button, .btn, [role="button"]');
-    if (interactiveParent) {
-      return interactiveParent;
-    }
+    if (interactiveParent) return interactiveParent;
     
-    // Check for interactive classes in parent
     const interactiveClasses = [
       'btn', 'portfolio-wrap', 'service-card', 'scroll-top', 
       'portfolio-item', 'card-action', 'portfolio-links',
@@ -166,20 +140,16 @@
       if (parent) return parent;
     }
     
-    // Check navigation menu
     if (element.closest('.navmenu')) {
       return element.closest('.navmenu a') || element.closest('.navmenu');
     }
     
-    // Only if not interactive, check if it's a text element
-    if (isTextElement(element)) {
-      return element;
-    }
+    if (isTextElement(element)) return element;
     
     return null;
   }
 
-  // Handle mouseover - expand cursor to fill element
+  // Handle mouseover
   document.addEventListener('mouseover', (e) => {
     const hoverableElement = findHoverableElement(e.target);
     
@@ -187,93 +157,65 @@
       currentHoverElement = hoverableElement;
       isHovering = true;
       
-      // Get element's bounding box
       const rect = hoverableElement.getBoundingClientRect();
       const isText = isTextElement(hoverableElement);
       
       if (isText) {
-        // For text elements: show I-beam cursor with font-size matching
+        // Text cursor
         const computedStyle = window.getComputedStyle(hoverableElement);
         const fontSize = parseFloat(computedStyle.fontSize);
-        const lineHeight = parseFloat(computedStyle.lineHeight) || fontSize * 1.2;
-        
-        // Calculate cursor height based on font size (slightly larger than font)
         const cursorHeight = Math.max(fontSize * 1.2, 16);
         
-        cursorFollower.classList.add('text-hover');
-        cursor.classList.add('text-cursor');
-        // Hide follower, show text cursor
         cursorFollower.style.opacity = '0';
+        cursor.classList.add('text-cursor');
         cursor.style.width = '2px';
         cursor.style.height = cursorHeight + 'px';
         cursor.style.borderRadius = '1px';
         cursor.style.backgroundColor = hoverColor;
-        cursor.style.transform = 'translate(-50%, -50%)';
       } else {
-        // For interactive elements: form a box around the element
+        // Box cursor for interactive elements
         const padding = 12;
-        
-        // Calculate target size and position
         targetWidth = rect.width + (padding * 2);
         targetHeight = rect.height + (padding * 2);
         targetX = rect.left + (rect.width / 2);
         targetY = rect.top + (rect.height / 2);
         
-        // Change to orange border when hovering
         cursorFollower.style.borderColor = hoverColor;
         cursorFollower.style.opacity = '1';
-        
-        // Remove glassy effect for interactive elements (so buttons are visible)
         cursorFollower.classList.add('no-glass');
         
-        // Reset cursor to normal dot
         cursor.classList.remove('text-cursor');
         cursor.style.width = '6px';
         cursor.style.height = '6px';
         cursor.style.borderRadius = '50%';
         cursor.style.backgroundColor = defaultColor;
-        cursor.style.transform = 'translate(-50%, -50%)';
         
-        cursorFollower.classList.remove('text-hover');
         cursorFollower.setAttribute('data-filling', 'true');
       }
-      
-      // Add hover class
-      cursor.classList.add('hover');
-      cursorFollower.classList.add('hover');
     }
   });
 
-  // Handle mouseout - shrink cursor back
+  // Handle mouseout
   document.addEventListener('mouseout', (e) => {
     const hoverableElement = findHoverableElement(e.target);
     
     if (hoverableElement === currentHoverElement) {
-      // Check if we're actually leaving the element
       const relatedTarget = e.relatedTarget;
       if (!relatedTarget || !hoverableElement.contains(relatedTarget)) {
         currentHoverElement = null;
         isHovering = false;
         
-        // Reset to normal size
         targetWidth = 40;
         targetHeight = 40;
         targetX = mouseX;
         targetY = mouseY;
         
-        // Reset to default color (border only)
         cursorFollower.style.borderColor = defaultColor;
-        
-        // Remove hover class
-        cursor.classList.remove('hover');
-        cursor.classList.remove('text-cursor');
-        cursorFollower.classList.remove('hover');
-        cursorFollower.classList.remove('text-hover');
+        cursorFollower.style.opacity = '1';
         cursorFollower.classList.remove('no-glass');
         cursorFollower.removeAttribute('data-filling');
         
-        // Reset cursor to normal
-        cursorFollower.style.opacity = '1';
+        cursor.classList.remove('text-cursor');
         cursor.style.width = '6px';
         cursor.style.height = '6px';
         cursor.style.borderRadius = '50%';
@@ -297,7 +239,7 @@
     }
   });
 
-  // Hide cursor when mouse leaves window
+  // Hide/show cursor
   document.addEventListener('mouseleave', () => {
     cursor.style.opacity = '0';
     cursorFollower.style.opacity = '0';
@@ -321,7 +263,6 @@
         cursorFollower.style.display = 'block';
       }
       
-      // Reset hover state on resize
       if (isHovering) {
         currentHoverElement = null;
         isHovering = false;
@@ -329,16 +270,11 @@
         targetHeight = 40;
         targetX = mouseX;
         targetY = mouseY;
-        cursor.classList.remove('hover');
-        cursor.classList.remove('text-cursor');
-        cursorFollower.classList.remove('hover');
-        cursorFollower.classList.remove('text-hover');
+        cursorFollower.style.borderColor = defaultColor;
+        cursorFollower.style.opacity = '1';
         cursorFollower.classList.remove('no-glass');
         cursorFollower.removeAttribute('data-filling');
-        cursorFollower.style.borderColor = defaultColor;
-        
-        // Reset cursor to normal
-        cursorFollower.style.opacity = '1';
+        cursor.classList.remove('text-cursor');
         cursor.style.width = '6px';
         cursor.style.height = '6px';
         cursor.style.borderRadius = '50%';

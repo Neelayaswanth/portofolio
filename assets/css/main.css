@@ -497,7 +497,7 @@ section,
   color: var(--default-color);
   background-color: var(--background-color);
   padding: 60px 0;
-  overflow: clip;
+  overflow: visible;
   position: relative;
   z-index: 1;
 }
@@ -2560,7 +2560,6 @@ section,
   border-radius: 50%;
   pointer-events: none;
   z-index: 999999;
-  mix-blend-mode: difference;
   transition: transform 0.1s ease-out;
 }
 
@@ -2678,11 +2677,6 @@ section,
   border-width: 1px;
 }
 
-.custom-cursor-follower.text-hover {
-  background-color: rgba(255, 146, 43, 0.1);
-  border-width: 1px;
-  mix-blend-mode: normal;
-}
 
 /* Cursor filling effect is handled by JavaScript */
 

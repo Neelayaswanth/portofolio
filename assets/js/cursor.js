@@ -162,6 +162,15 @@
 
   // Smooth animation for follower
   function animateCursor() {
+    // Update cursor border if hovering (for scroll and dynamic updates)
+    if (isHovering && currentHoverElement) {
+      // Throttle updates to avoid performance issues
+      if (!animateCursor.lastUpdate || Date.now() - animateCursor.lastUpdate > 16) {
+        updateCursorBorder();
+        animateCursor.lastUpdate = Date.now();
+      }
+    }
+    
     // Smooth cursor follower movement with easing
     const dx = targetX - followerX;
     const dy = targetY - followerY;
@@ -185,6 +194,9 @@
     
     requestAnimationFrame(animateCursor);
   }
+  
+  // Initialize lastUpdate timestamp
+  animateCursor.lastUpdate = 0;
 
   // Start animation
   animateCursor();
@@ -420,17 +432,8 @@
     }
   }, { passive: true });
 
-  // Also update on mouse move while hovering (for smooth updates)
-  const originalMouseMove = document.addEventListener;
-  document.addEventListener('mousemove', (e) => {
-    if (isHovering && currentHoverElement) {
-      // Throttle updates during mouse move
-      clearTimeout(scrollTimer);
-      scrollTimer = setTimeout(() => {
-        updateCursorBorder();
-      }, 16); // ~60fps
-    }
-  });
+  // Update cursor border continuously while hovering (in animation loop)
+  // This is already handled in the animateCursor function and scroll event
 
   // Handle window resize
   let resizeTimer;

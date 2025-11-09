@@ -103,6 +103,15 @@
       float: right;
       margin-top: -50px;
     }
+    
+    .view-more-btn {
+      transition: all 0.3s ease;
+    }
+    
+    .view-more-btn:hover {
+      transform: translateY(-2px);
+    }
+    
   </style>
 </head>
 <body>
@@ -184,7 +193,12 @@
       <div class="row mt-4">
         <div class="col-md-12">
           <div class="stat-card">
-            <h3 class="mb-3"><i class="bi bi-people"></i> Recent Visitor Activity</h3>
+            <div class="d-flex justify-content-between align-items-center mb-3">
+              <h3 class="mb-0"><i class="bi bi-people"></i> Recent Visitor Activity</h3>
+              <button class="btn btn-sm btn-outline-light" id="visitors-view-more-btn" onclick="toggleVisitorsView()" style="display: none;">
+                <i class="bi bi-chevron-down" id="visitors-view-more-icon"></i> View More
+              </button>
+            </div>
             <div class="table-responsive">
               <table class="table table-dark table-hover">
                 <thead>
@@ -210,7 +224,12 @@
       <div class="row mt-4">
         <div class="col-md-12">
           <div class="stat-card">
-            <h3 class="mb-3"><i class="bi bi-eye"></i> Recent Profile Views</h3>
+            <div class="d-flex justify-content-between align-items-center mb-3">
+              <h3 class="mb-0"><i class="bi bi-eye"></i> Recent Profile Views</h3>
+              <button class="btn btn-sm btn-outline-light" id="views-view-more-btn" onclick="toggleViewsView()" style="display: none;">
+                <i class="bi bi-chevron-down" id="views-view-more-icon"></i> View More
+              </button>
+            </div>
             <div class="table-responsive">
               <table class="table table-dark table-hover">
                 <thead>
@@ -235,7 +254,12 @@
       <div class="row mt-4">
         <div class="col-md-12">
           <div class="stat-card">
-            <h3 class="mb-3">Recent Messages</h3>
+            <div class="d-flex justify-content-between align-items-center mb-3">
+              <h3 class="mb-0">Recent Messages</h3>
+              <button class="btn btn-sm btn-outline-light" id="messages-view-more-btn" onclick="toggleMessagesView()" style="display: none;">
+                <i class="bi bi-chevron-down" id="messages-view-more-icon"></i> View More
+              </button>
+            </div>
             <div class="table-responsive">
               <table class="table table-dark table-hover">
                 <thead>
@@ -378,6 +402,14 @@
       }
     }
 
+    // Store full data for view more functionality
+    window.allVisitorsData = [];
+    window.allViewsData = [];
+    window.allMessagesData = [];
+    window.visitorsExpanded = false;
+    window.viewsExpanded = false;
+    window.messagesExpanded = false;
+
     // Check authentication on page load
     document.addEventListener('DOMContentLoaded', function() {
       checkAuthentication();
@@ -497,57 +529,20 @@
           throw messagesError;
         }
 
+        // Store all data
+        window.allMessagesData = messagesData || [];
+        window.messagesData = messagesData || [];
+
+        const messagesTbody = document.getElementById('messages-table');
         if (!messagesData || messagesData.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="8" class="text-center text-info">📭 No messages yet. Messages will appear here when someone contacts you through the portfolio.</td></tr>';
+          messagesTbody.innerHTML = '<tr><td colspan="8" class="text-center text-info">📭 No messages yet. Messages will appear here when someone contacts you through the portfolio.</td></tr>';
+          document.getElementById('messages-view-more-btn').style.display = 'none';
         } else {
-          tbody.innerHTML = messagesData.map(msg => {
-            // Escape HTML
-            const escapeHtml = (text) => {
-              if (!text) return '';
-              const div = document.createElement('div');
-              div.textContent = text;
-              return div.innerHTML;
-            };
-            
-            const messagePreview = msg.message ? (msg.message.length > 50 ? msg.message.substring(0, 50) + '...' : msg.message) : 'No message';
-            const safeMessage = escapeHtml(msg.message || '');
-            const safeName = escapeHtml(msg.name || '');
-            const safeEmail = escapeHtml(msg.email || '');
-            const safeSubject = escapeHtml(msg.subject || 'No Subject');
-            
-            return `
-              <tr class="${msg.read_status ? '' : 'table-warning'}" data-message-id="${msg.id}">
-                <td>${msg.id}</td>
-                <td>${safeName}</td>
-                <td><a href="mailto:${safeEmail}">${safeEmail}</a></td>
-                <td>${safeSubject}</td>
-                <td>
-                  <button class="btn btn-sm btn-outline-light" onclick="showMessageModal(${msg.id})" title="Click to view full message">
-                    ${escapeHtml(messagePreview)}
-                  </button>
-                </td>
-                <td>${new Date(msg.created_at).toLocaleString()}</td>
-                <td>
-                  <span class="badge ${msg.read_status ? 'bg-success' : 'bg-warning'}">
-                    ${msg.read_status ? 'Read' : 'Unread'}
-                  </span>
-                </td>
-                <td>
-                  ${!msg.read_status ? `
-                    <button class="btn btn-sm btn-success" onclick="markAsRead(${msg.id})" title="Mark as Read">
-                      <i class="bi bi-check-circle"></i>
-                    </button>
-                  ` : ''}
-                  <button class="btn btn-sm btn-danger" onclick="deleteMessage(${msg.id})" title="Delete">
-                    <i class="bi bi-trash"></i>
-                  </button>
-                </td>
-              </tr>
-            `;
-          }).join('');
-          
-          // Store messages data globally for modal access
-          window.messagesData = messagesData;
+          renderMessagesTable(10); // Show first 10
+          // Show view more button if there are more than 10 items
+          if (messagesData.length > 10) {
+            document.getElementById('messages-view-more-btn').style.display = 'block';
+          }
         }
       } catch (error) {
         console.error('Error loading analytics:', error);
@@ -661,8 +656,10 @@
           throw error;
         }
 
-        // Reload messages
-        loadAnalytics();
+        // Reload messages (refresh the table)
+        const currentLimit = window.messagesExpanded ? null : 10;
+        renderMessagesTable(currentLimit);
+        loadAnalytics(); // Reload full data
       } catch (error) {
         console.error('Error marking message as read:', error);
         alert('Error marking message as read: ' + error.message);
@@ -691,8 +688,10 @@
           throw error;
         }
 
-        // Reload messages
-        loadAnalytics();
+        // Reload messages (refresh the table)
+        const currentLimit = window.messagesExpanded ? null : 10;
+        renderMessagesTable(currentLimit);
+        loadAnalytics(); // Reload full data
       } catch (error) {
         console.error('Error deleting message:', error);
         alert('Error deleting message: ' + error.message);
@@ -714,42 +713,78 @@
           .from('visitors')
           .select('*')
           .order('last_visit', { ascending: false })
-          .limit(50);
+          .limit(100);
 
         if (visitorsError) {
           throw visitorsError;
         }
 
+        // Store all data
+        window.allVisitorsData = visitorsData || [];
+
         if (!visitorsData || visitorsData.length === 0) {
           tbody.innerHTML = '<tr><td colspan="5" class="text-center text-info">📭 No visitor data yet.</td></tr>';
+          document.getElementById('visitors-view-more-btn').style.display = 'none';
         } else {
-          tbody.innerHTML = visitorsData.map(visitor => {
-            const escapeHtml = (text) => {
-              if (!text) return 'N/A';
-              const div = document.createElement('div');
-              div.textContent = text;
-              return div.innerHTML;
-            };
-            
-            const userAgent = visitor.user_agent || 'Unknown';
-            const shortUserAgent = userAgent.length > 50 ? userAgent.substring(0, 50) + '...' : userAgent;
-            const firstVisit = visitor.first_visit ? new Date(visitor.first_visit).toLocaleString() : 'N/A';
-            const lastVisit = visitor.last_visit ? new Date(visitor.last_visit).toLocaleString() : 'N/A';
-            
-            return `
-              <tr>
-                <td>${escapeHtml(visitor.ip_address || 'Unknown')}</td>
-                <td>${firstVisit}</td>
-                <td><strong>${lastVisit}</strong></td>
-                <td><span class="badge bg-info">${visitor.visit_count || 1}</span></td>
-                <td title="${escapeHtml(userAgent)}">${escapeHtml(shortUserAgent)}</td>
-              </tr>
-            `;
-          }).join('');
+          renderVisitorsTable(10); // Show first 10
+          // Show view more button if there are more than 10 items
+          if (visitorsData.length > 10) {
+            document.getElementById('visitors-view-more-btn').style.display = 'block';
+          }
         }
       } catch (error) {
         console.error('Error loading visitor activity:', error);
         tbody.innerHTML = `<tr><td colspan="5" class="text-center text-danger">⚠️ Error loading visitor data: ${error.message}</td></tr>`;
+      }
+    }
+
+    // Render visitors table
+    function renderVisitorsTable(limit = null) {
+      const tbody = document.getElementById('visitors-table');
+      const dataToShow = limit ? window.allVisitorsData.slice(0, limit) : window.allVisitorsData;
+      
+      if (window.allVisitorsData.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-info">📭 No visitor data yet.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = dataToShow.map((visitor) => {
+        const escapeHtml = (text) => {
+          if (!text) return 'N/A';
+          const div = document.createElement('div');
+          div.textContent = text;
+          return div.innerHTML;
+        };
+        
+        const userAgent = visitor.user_agent || 'Unknown';
+        const shortUserAgent = userAgent.length > 50 ? userAgent.substring(0, 50) + '...' : userAgent;
+        const firstVisit = visitor.first_visit ? new Date(visitor.first_visit).toLocaleString() : 'N/A';
+        const lastVisit = visitor.last_visit ? new Date(visitor.last_visit).toLocaleString() : 'N/A';
+        
+        return `
+          <tr>
+            <td>${escapeHtml(visitor.ip_address || 'Unknown')}</td>
+            <td>${firstVisit}</td>
+            <td><strong>${lastVisit}</strong></td>
+            <td><span class="badge bg-info">${visitor.visit_count || 1}</span></td>
+            <td title="${escapeHtml(userAgent)}">${escapeHtml(shortUserAgent)}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // Toggle visitors view
+    function toggleVisitorsView() {
+      window.visitorsExpanded = !window.visitorsExpanded;
+      const btn = document.getElementById('visitors-view-more-btn');
+      const icon = document.getElementById('visitors-view-more-icon');
+      
+      if (window.visitorsExpanded) {
+        renderVisitorsTable(); // Show all
+        btn.innerHTML = '<i class="bi bi-chevron-up"></i> View Less';
+      } else {
+        renderVisitorsTable(10); // Show first 10
+        btn.innerHTML = '<i class="bi bi-chevron-down"></i> View More';
       }
     }
 
@@ -768,42 +803,149 @@
           .from('profile_views')
           .select('*')
           .order('viewed_at', { ascending: false })
-          .limit(50);
+          .limit(100);
 
         if (viewsError) {
           throw viewsError;
         }
 
+        // Store all data
+        window.allViewsData = viewsData || [];
+
         if (!viewsData || viewsData.length === 0) {
           tbody.innerHTML = '<tr><td colspan="4" class="text-center text-info">📭 No view data yet.</td></tr>';
+          document.getElementById('views-view-more-btn').style.display = 'none';
         } else {
-          tbody.innerHTML = viewsData.map(view => {
-            const escapeHtml = (text) => {
-              if (!text) return 'N/A';
-              const div = document.createElement('div');
-              div.textContent = text;
-              return div.innerHTML;
-            };
-            
-            const userAgent = view.user_agent || 'Unknown';
-            const shortUserAgent = userAgent.length > 40 ? userAgent.substring(0, 40) + '...' : userAgent;
-            const viewTime = view.viewed_at ? new Date(view.viewed_at).toLocaleString() : 'N/A';
-            const referrer = view.referrer && view.referrer !== 'direct' ? view.referrer : 'Direct';
-            const shortReferrer = referrer.length > 40 ? referrer.substring(0, 40) + '...' : referrer;
-            
-            return `
-              <tr>
-                <td>${escapeHtml(view.ip_address || 'Unknown')}</td>
-                <td><strong>${viewTime}</strong></td>
-                <td title="${escapeHtml(referrer)}">${escapeHtml(shortReferrer)}</td>
-                <td title="${escapeHtml(userAgent)}">${escapeHtml(shortUserAgent)}</td>
-              </tr>
-            `;
-          }).join('');
+          renderViewsTable(10); // Show first 10
+          // Show view more button if there are more than 10 items
+          if (viewsData.length > 10) {
+            document.getElementById('views-view-more-btn').style.display = 'block';
+          }
         }
       } catch (error) {
         console.error('Error loading recent views:', error);
         tbody.innerHTML = `<tr><td colspan="4" class="text-center text-danger">⚠️ Error loading view data: ${error.message}</td></tr>`;
+      }
+    }
+
+    // Render views table
+    function renderViewsTable(limit = null) {
+      const tbody = document.getElementById('views-table');
+      const dataToShow = limit ? window.allViewsData.slice(0, limit) : window.allViewsData;
+      
+      if (window.allViewsData.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-info">📭 No view data yet.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = dataToShow.map((view) => {
+        const escapeHtml = (text) => {
+          if (!text) return 'N/A';
+          const div = document.createElement('div');
+          div.textContent = text;
+          return div.innerHTML;
+        };
+        
+        const userAgent = view.user_agent || 'Unknown';
+        const shortUserAgent = userAgent.length > 40 ? userAgent.substring(0, 40) + '...' : userAgent;
+        const viewTime = view.viewed_at ? new Date(view.viewed_at).toLocaleString() : 'N/A';
+        const referrer = view.referrer && view.referrer !== 'direct' ? view.referrer : 'Direct';
+        const shortReferrer = referrer.length > 40 ? referrer.substring(0, 40) + '...' : referrer;
+        
+        return `
+          <tr>
+            <td>${escapeHtml(view.ip_address || 'Unknown')}</td>
+            <td><strong>${viewTime}</strong></td>
+            <td title="${escapeHtml(referrer)}">${escapeHtml(shortReferrer)}</td>
+            <td title="${escapeHtml(userAgent)}">${escapeHtml(shortUserAgent)}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // Toggle views view
+    function toggleViewsView() {
+      window.viewsExpanded = !window.viewsExpanded;
+      const btn = document.getElementById('views-view-more-btn');
+      
+      if (window.viewsExpanded) {
+        renderViewsTable(); // Show all
+        btn.innerHTML = '<i class="bi bi-chevron-up"></i> View Less';
+      } else {
+        renderViewsTable(10); // Show first 10
+        btn.innerHTML = '<i class="bi bi-chevron-down"></i> View More';
+      }
+    }
+
+    // Render messages table
+    function renderMessagesTable(limit = null) {
+      const tbody = document.getElementById('messages-table');
+      
+      if (!window.allMessagesData || window.allMessagesData.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-info">📭 No messages yet. Messages will appear here when someone contacts you through the portfolio.</td></tr>';
+        return;
+      }
+
+      const dataToShow = limit ? window.allMessagesData.slice(0, limit) : window.allMessagesData;
+      
+      tbody.innerHTML = dataToShow.map((msg) => {
+        // Escape HTML
+        const escapeHtml = (text) => {
+          if (!text) return '';
+          const div = document.createElement('div');
+          div.textContent = text;
+          return div.innerHTML;
+        };
+        
+        const messagePreview = msg.message ? (msg.message.length > 50 ? msg.message.substring(0, 50) + '...' : msg.message) : 'No message';
+        const safeMessage = escapeHtml(msg.message || '');
+        const safeName = escapeHtml(msg.name || '');
+        const safeEmail = escapeHtml(msg.email || '');
+        const safeSubject = escapeHtml(msg.subject || 'No Subject');
+        
+        return `
+          <tr class="${msg.read_status ? '' : 'table-warning'}" data-message-id="${msg.id}">
+            <td>${msg.id}</td>
+            <td>${safeName}</td>
+            <td><a href="mailto:${safeEmail}">${safeEmail}</a></td>
+            <td>${safeSubject}</td>
+            <td>
+              <button class="btn btn-sm btn-outline-light" onclick="showMessageModal(${msg.id})" title="Click to view full message">
+                ${escapeHtml(messagePreview)}
+              </button>
+            </td>
+            <td>${new Date(msg.created_at).toLocaleString()}</td>
+            <td>
+              <span class="badge ${msg.read_status ? 'bg-success' : 'bg-warning'}">
+                ${msg.read_status ? 'Read' : 'Unread'}
+              </span>
+            </td>
+            <td>
+              ${!msg.read_status ? `
+                <button class="btn btn-sm btn-success" onclick="markAsRead(${msg.id})" title="Mark as Read">
+                  <i class="bi bi-check-circle"></i>
+                </button>
+              ` : ''}
+              <button class="btn btn-sm btn-danger" onclick="deleteMessage(${msg.id})" title="Delete">
+                <i class="bi bi-trash"></i>
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // Toggle messages view
+    function toggleMessagesView() {
+      window.messagesExpanded = !window.messagesExpanded;
+      const btn = document.getElementById('messages-view-more-btn');
+      
+      if (window.messagesExpanded) {
+        renderMessagesTable(); // Show all
+        btn.innerHTML = '<i class="bi bi-chevron-up"></i> View Less';
+      } else {
+        renderMessagesTable(10); // Show first 10
+        btn.innerHTML = '<i class="bi bi-chevron-down"></i> View More';
       }
     }
   </script>

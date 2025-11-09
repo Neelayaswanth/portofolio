@@ -341,10 +341,32 @@
       }
       
       // Last login time (from localStorage)
+      // Get the stored last login, but exclude the current session's login time
       const lastLogin = localStorage.getItem('adminLastLogin');
+      const currentLogin = sessionStorage.getItem('adminLoginTime');
+      
       if (lastLogin) {
         const lastLoginDate = new Date(lastLogin);
-        document.getElementById('last-login-time').textContent = lastLoginDate.toLocaleString();
+        const currentLoginDate = currentLogin ? new Date(parseInt(currentLogin)) : null;
+        
+        // Make sure we're not showing the current login as the last login
+        if (currentLoginDate && lastLoginDate.getTime() === currentLoginDate.getTime()) {
+          // If they match, this might be the first login, check login history
+          const loginHistory = JSON.parse(localStorage.getItem('adminLoginHistory') || '[]');
+          if (loginHistory.length > 1) {
+            // Get the second most recent login (first is current)
+            const previousLogin = loginHistory[1];
+            if (previousLogin) {
+              document.getElementById('last-login-time').textContent = previousLogin.date || new Date(previousLogin.timestamp).toLocaleString();
+            } else {
+              document.getElementById('last-login-time').textContent = 'First login';
+            }
+          } else {
+            document.getElementById('last-login-time').textContent = 'First login';
+          }
+        } else {
+          document.getElementById('last-login-time').textContent = lastLoginDate.toLocaleString();
+        }
       } else {
         document.getElementById('last-login-time').textContent = 'First login';
       }
@@ -364,17 +386,40 @@
       
       // Validate credentials
       if (username === ADMIN_CREDENTIALS.username && password === ADMIN_CREDENTIALS.password) {
-        // Set authentication in sessionStorage
-        const loginTime = new Date().toISOString();
-        sessionStorage.setItem('adminAuthenticated', 'true');
-        sessionStorage.setItem('adminLoginTime', Date.now().toString());
+        // Get the previous login time before updating (this becomes the "last login")
+        const previousLoginTime = sessionStorage.getItem('adminLoginTime') || localStorage.getItem('adminCurrentLogin');
         
-        // Save last login time to localStorage (persists across sessions)
-        localStorage.setItem('adminLastLogin', loginTime);
-        localStorage.setItem('adminLoginHistory', JSON.stringify([
-          ...(JSON.parse(localStorage.getItem('adminLoginHistory') || '[]')),
-          { timestamp: loginTime, date: new Date(loginTime).toLocaleString() }
-        ].slice(-10))); // Keep last 10 logins
+        // Set current login time
+        const currentLoginTime = Date.now();
+        const loginTimeISO = new Date().toISOString();
+        
+        // Set authentication in sessionStorage
+        sessionStorage.setItem('adminAuthenticated', 'true');
+        sessionStorage.setItem('adminLoginTime', currentLoginTime.toString());
+        
+        // If there was a previous login, save it as "last login"
+        if (previousLoginTime) {
+          const previousLoginDate = new Date(parseInt(previousLoginTime));
+          localStorage.setItem('adminLastLogin', previousLoginDate.toISOString());
+        } else {
+          // First time login - check if there's a stored last login from previous session
+          const storedLastLogin = localStorage.getItem('adminLastLogin');
+          if (!storedLastLogin) {
+            // This is truly the first login
+            localStorage.setItem('adminLastLogin', loginTimeISO);
+          }
+        }
+        
+        // Save current login time to localStorage (for next session's "last login")
+        localStorage.setItem('adminCurrentLogin', currentLoginTime.toString());
+        
+        // Save to login history
+        const loginHistory = JSON.parse(localStorage.getItem('adminLoginHistory') || '[]');
+        loginHistory.unshift({ 
+          timestamp: loginTimeISO, 
+          date: new Date(loginTimeISO).toLocaleString() 
+        });
+        localStorage.setItem('adminLoginHistory', JSON.stringify(loginHistory.slice(0, 10))); // Keep last 10 logins
         
         // Show dashboard
         showDashboard();
@@ -392,6 +437,15 @@
     // Logout function
     function logout() {
       if (confirm('Are you sure you want to logout?')) {
+        // Save current login time as last login before clearing session
+        const currentLoginTime = sessionStorage.getItem('adminLoginTime');
+        if (currentLoginTime) {
+          const loginDate = new Date(parseInt(currentLoginTime));
+          localStorage.setItem('adminLastLogin', loginDate.toISOString());
+          localStorage.setItem('adminCurrentLogin', currentLoginTime);
+        }
+        
+        // Clear session storage
         sessionStorage.removeItem('adminAuthenticated');
         sessionStorage.removeItem('adminLoginTime');
         showLogin();
@@ -412,7 +466,16 @@
 
     // Check authentication on page load
     document.addEventListener('DOMContentLoaded', function() {
-      checkAuthentication();
+      // On page load, if user is already logged in, preserve the current login time
+      // and don't overwrite the last login
+      const isAuthenticated = sessionStorage.getItem('adminAuthenticated') === 'true';
+      if (isAuthenticated) {
+        // User is already logged in, just show dashboard without updating login times
+        checkAuthentication();
+      } else {
+        // User is not logged in, proceed with normal authentication check
+        checkAuthentication();
+      }
       
       // Auto-logout after 2 hours of inactivity (optional security feature)
       const loginTime = sessionStorage.getItem('adminLoginTime');

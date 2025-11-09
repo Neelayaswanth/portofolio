@@ -8,9 +8,7 @@ package-lock.json
 # Environment variables
 .env
 .env.local
-.env.development.local
-.env.test.local
-.env.production.local
+.env.*.local
 
 # IDE
 .vscode/
@@ -24,36 +22,22 @@ package-lock.json
 Thumbs.db
 desktop.ini
 
-# Logs
-logs/
-*.log
-
-# Database
-*.sql
-!backend/database/schema.sql
+# Backend (no longer needed with Supabase)
+backend/node_modules/
+backend/package-lock.json
+backend/.env
 
 # Temporary files
 *.tmp
 *.temp
-.cache/
+*.log
 
-# Build files
+# Build files (if any)
 dist/
 build/
 
-# Backend specific
-backend/node_modules/
-backend/.env
+# Supabase (keep schema, ignore local config if any)
+# backend/database/supabase-schema.sql - KEEP THIS
 
-# Documentation (optional - remove if you want to keep)
-SETUP_GUIDE.md
-FIX_CORS.md
-FIXES_APPLIED.md
-START_SERVER.md
-DATABASE_SETUP.md
-QUICK_SETUP.md
-STEP3_CONFIG.md
-STEP4_START_SERVER.md
-TESTING_GUIDE.md
-FIX_CORS.md
-
+# Test files (optional - you can remove test-supabase.html from git if needed)
+# test-supabase.html

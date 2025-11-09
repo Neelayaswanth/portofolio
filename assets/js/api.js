@@ -1,30 +1,28 @@
 /**
- * Portfolio API Integration
+ * Portfolio API Integration using Supabase
  * Handles contact form submissions and profile view tracking
  */
 
-// API Configuration - Auto-detect based on current origin
-const getApiBaseUrl = () => {
-  const currentOrigin = window.location.origin;
-  
-  // Production - use the same origin for API (assuming API is on same domain)
-  if (currentOrigin.includes('yaswanthneela.me') || currentOrigin.includes('github.io') || currentOrigin.includes('netlify.app') || currentOrigin.includes('vercel.app')) {
-    // For production, the API should be on the same domain or a subdomain
-    // Update this to match your production API URL
-    return 'https://your-api-domain.com/api'; // TODO: Update with your production API URL
+// Get Supabase client
+function getSupabaseClient() {
+  // Try to get from config first
+  if (window.SupabaseConfig && window.SupabaseConfig.client) {
+    const client = window.SupabaseConfig.client();
+    if (client) return client;
   }
   
-  // Development - use localhost
-  if (currentOrigin.includes('127.0.0.1')) {
-    return 'http://127.0.0.1:3000/api';
+  // Fallback: try to get from global supabase
+  if (typeof supabase !== 'undefined' && typeof window.supabase !== 'undefined') {
+    // Initialize if config exists
+    if (window.SupabaseConfig && window.SupabaseConfig.config) {
+      const config = window.SupabaseConfig.config;
+      return supabase.createClient(config.url, config.anonKey);
+    }
   }
   
-  // Default to localhost
-  return 'http://localhost:3000/api';
-};
-
-const API_BASE_URL = getApiBaseUrl();
-console.log('API Base URL:', API_BASE_URL);
+  console.error('✗ Supabase client not initialized. Make sure supabase-config.js is loaded.');
+  return null;
+}
 
 // Generate or retrieve session ID
 function getSessionId() {
@@ -36,39 +34,169 @@ function getSessionId() {
   return sessionId;
 }
 
+// Get client IP address (approximate using a service)
+async function getClientIP() {
+  try {
+    const response = await fetch('https://api.ipify.org?format=json');
+    const data = await response.json();
+    return data.ip || 'unknown';
+  } catch (error) {
+    console.warn('Could not fetch IP address:', error);
+    return 'unknown';
+  }
+}
+
 // Track profile view
 async function trackProfileView() {
+  const supabase = getSupabaseClient();
+  if (!supabase) {
+    console.error('Supabase client not initialized');
+    return;
+  }
+
   try {
     const sessionId = getSessionId();
     const referrer = document.referrer || 'direct';
+    const userAgent = navigator.userAgent || 'unknown';
+    const ipAddress = await getClientIP();
     
-    console.log('Tracking profile view...', { sessionId: sessionId.substring(0, 20), referrer, apiUrl: `${API_BASE_URL}/views` });
-    
-    const response = await fetch(`${API_BASE_URL}/views`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        session_id: sessionId,
-        referrer: referrer
-      })
+    console.log('Tracking profile view...', { 
+      sessionId: sessionId.substring(0, 20), 
+      referrer,
+      ipAddress: ipAddress.substring(0, 15) + '...'
     });
+    
+    // Insert profile view
+    const { data: viewData, error: viewError } = await supabase
+      .from('profile_views')
+      .insert([
+        {
+          ip_address: ipAddress,
+          user_agent: userAgent,
+          referrer: referrer,
+          session_id: sessionId
+        }
+      ])
+      .select();
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Profile view tracking failed:', response.status, errorText);
+    if (viewError) {
+      console.error('Error tracking view:', viewError);
       return;
     }
 
-    const data = await response.json();
-    if (data.success) {
-      console.log('✓ Profile view tracked successfully', data);
-      // Optionally update view count display
-      updateViewCount();
+    // Update or insert visitor
+    const uniqueVisitorId = ipAddress === 'unknown' || ipAddress === '127.0.0.1' 
+      ? `session_${sessionId}` 
+      : ipAddress;
+
+    // Check if visitor exists and update or insert
+    const { data: existingVisitor, error: visitorError } = await supabase
+      .from('visitors')
+      .select('id, visit_count')
+      .eq('ip_address', uniqueVisitorId)
+      .maybeSingle();
+
+    if (existingVisitor && !visitorError) {
+      // Update existing visitor
+      await supabase
+        .from('visitors')
+        .update({
+          visit_count: (existingVisitor.visit_count || 1) + 1,
+          last_visit: new Date().toISOString(),
+          user_agent: userAgent,
+          referrer: referrer
+        })
+        .eq('ip_address', uniqueVisitorId);
     } else {
-      console.error('Profile view tracking failed:', data.message);
+      // Try to insert new visitor
+      const { error: insertError } = await supabase
+        .from('visitors')
+        .insert({
+          ip_address: uniqueVisitorId,
+          user_agent: userAgent,
+          referrer: referrer,
+          visit_count: 1
+        });
+      
+      // If insert fails due to unique constraint (race condition), fetch and update
+      if (insertError && insertError.code === '23505') {
+        // Visitor was created between check and insert, fetch current count and update
+        const { data: raceVisitor } = await supabase
+          .from('visitors')
+          .select('visit_count')
+          .eq('ip_address', uniqueVisitorId)
+          .single();
+        
+        if (raceVisitor) {
+          await supabase
+            .from('visitors')
+            .update({
+              visit_count: (raceVisitor.visit_count || 1) + 1,
+              last_visit: new Date().toISOString(),
+              user_agent: userAgent,
+              referrer: referrer
+            })
+            .eq('ip_address', uniqueVisitorId);
+        }
+      } else if (insertError) {
+        console.error('Error inserting visitor:', insertError);
+      }
     }
+
+    // Update analytics for today
+    const today = new Date().toISOString().split('T')[0];
+    const { data: analyticsData, error: analyticsError } = await supabase
+      .from('analytics')
+      .select('*')
+      .eq('date', today)
+      .single();
+
+    if (analyticsData && !analyticsError) {
+      // Update existing analytics
+      await supabase
+        .from('analytics')
+        .update({
+          total_views: (analyticsData.total_views || 0) + 1
+        })
+        .eq('date', today);
+    } else {
+      // Insert new analytics (using upsert to handle race conditions)
+      await supabase
+        .from('analytics')
+        .upsert({
+          date: today,
+          total_views: 1,
+          unique_visitors: 0,
+          messages_received: 0
+        }, {
+          onConflict: 'date'
+        });
+    }
+
+    // Update unique visitors count for today
+    // Get all views for today and count unique IPs
+    const startOfDay = new Date(today + 'T00:00:00Z').toISOString();
+    const endOfDay = new Date(today + 'T23:59:59Z').toISOString();
+    
+    const { data: uniqueViews } = await supabase
+      .from('profile_views')
+      .select('ip_address')
+      .gte('viewed_at', startOfDay)
+      .lte('viewed_at', endOfDay);
+
+    if (uniqueViews && uniqueViews.length > 0) {
+      const uniqueIPs = new Set(uniqueViews.map(v => v.ip_address).filter(ip => ip && ip !== 'unknown'));
+      await supabase
+        .from('analytics')
+        .update({
+          unique_visitors: uniqueIPs.size
+        })
+        .eq('date', today);
+    }
+
+    console.log('✓ Profile view tracked successfully');
+    // Optionally update view count display
+    updateViewCount();
   } catch (error) {
     console.error('Error tracking profile view:', error);
     // Log but don't interrupt user experience
@@ -77,16 +205,26 @@ async function trackProfileView() {
 
 // Get and display view count
 async function updateViewCount() {
+  const supabase = getSupabaseClient();
+  if (!supabase) {
+    console.error('Supabase client not initialized');
+    return;
+  }
+
   try {
-    const response = await fetch(`${API_BASE_URL}/views/count`);
-    const data = await response.json();
-    
-    if (data.success) {
-      // Update view count display if element exists
-      const viewCountElement = document.getElementById('view-count');
-      if (viewCountElement) {
-        viewCountElement.textContent = data.count.toLocaleString();
-      }
+    const { count, error } = await supabase
+      .from('profile_views')
+      .select('*', { count: 'exact', head: true });
+
+    if (error) {
+      console.error('Error fetching view count:', error);
+      return;
+    }
+
+    // Update view count display if element exists
+    const viewCountElement = document.getElementById('view-count');
+    if (viewCountElement) {
+      viewCountElement.textContent = (count || 0).toLocaleString();
     }
   } catch (error) {
     console.error('Error fetching view count:', error);
@@ -95,28 +233,71 @@ async function updateViewCount() {
 
 // Submit contact form
 async function submitContactForm(formData) {
-  try {
-    const response = await fetch(`${API_BASE_URL}/messages`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        name: formData.name,
-        email: formData.email,
-        subject: formData.subject,
-        message: formData.message
-      })
-    });
+  const supabase = getSupabaseClient();
+  if (!supabase) {
+    return {
+      success: false,
+      message: 'Database connection not available. Please try again later.'
+    };
+  }
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('API error response:', errorText);
-      throw new Error(`HTTP error! status: ${response.status}`);
+  try {
+    // Insert message
+    const { data, error } = await supabase
+      .from('messages')
+      .insert([
+        {
+          name: formData.name,
+          email: formData.email,
+          subject: formData.subject || 'No Subject',
+          message: formData.message
+        }
+      ])
+      .select();
+
+    if (error) {
+      console.error('Error submitting message:', error);
+      return {
+        success: false,
+        message: error.message || 'Failed to send message. Please try again.'
+      };
     }
 
-    const data = await response.json();
-    return data;
+    // Update analytics for today
+    const today = new Date().toISOString().split('T')[0];
+    const { data: analyticsData, error: analyticsError } = await supabase
+      .from('analytics')
+      .select('*')
+      .eq('date', today)
+      .single();
+
+    if (analyticsData && !analyticsError) {
+      // Update existing analytics
+      await supabase
+        .from('analytics')
+        .update({
+          messages_received: (analyticsData.messages_received || 0) + 1
+        })
+        .eq('date', today);
+    } else {
+      // Insert new analytics (using upsert to handle race conditions)
+      await supabase
+        .from('analytics')
+        .upsert({
+          date: today,
+          total_views: 0,
+          unique_visitors: 0,
+          messages_received: 1
+        }, {
+          onConflict: 'date'
+        });
+    }
+
+    return {
+      success: true,
+      message: 'Message sent successfully',
+      id: data[0].id
+    };
   } catch (error) {
     console.error('Error submitting form:', error);
     return {
@@ -128,8 +309,16 @@ async function submitContactForm(formData) {
 
 // Initialize API integration
 document.addEventListener('DOMContentLoaded', function() {
-  // Track profile view on page load
-  trackProfileView();
+  // Wait a bit for Supabase to initialize
+  setTimeout(() => {
+    const supabase = getSupabaseClient();
+    if (supabase) {
+      // Track profile view on page load
+      trackProfileView();
+    } else {
+      console.warn('Supabase not initialized, skipping profile view tracking');
+    }
+  }, 1000);
 
   // Handle contact form submission
   const contactForm = document.querySelector('.php-email-form');
@@ -181,7 +370,7 @@ document.addEventListener('DOMContentLoaded', function() {
         submitButton.textContent = 'Sending...';
       }
 
-      // Submit to API
+      // Submit to Supabase
       try {
         const result = await submitContactForm(formData);
 
@@ -242,6 +431,6 @@ window.PortfolioAPI = {
   trackProfileView,
   updateViewCount,
   submitContactForm,
-  getSessionId
+  getSessionId,
+  getSupabaseClient: getSupabaseClient
 };
-

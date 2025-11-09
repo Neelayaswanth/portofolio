@@ -100,25 +100,32 @@
     </div>
   </div>
 
-  <script>
-    // Auto-detect API URL based on current origin
-    const getApiBaseUrl = () => {
-      const currentOrigin = window.location.origin;
-      // If running on 127.0.0.1, use 127.0.0.1 for API too
-      if (currentOrigin.includes('127.0.0.1')) {
-        return 'http://127.0.0.1:3000/api';
-      }
-      // Otherwise use localhost
-        return 'https://portofolio-c57b.onrender.com/api';    };
-    
-    const API_BASE_URL = getApiBaseUrl();
+  <!-- Supabase Client Library -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  
+  <!-- Supabase Configuration -->
+  <script src="assets/js/supabase-config.js"></script>
 
-    // Check server connection
-    async function checkServerConnection() {
+  <script>
+    // Get Supabase client
+    function getSupabaseClient() {
+      if (window.SupabaseConfig && window.SupabaseConfig.client) {
+        return window.SupabaseConfig.client();
+      }
+      return null;
+    }
+
+    // Check database connection
+    async function checkDatabaseConnection() {
+      const supabase = getSupabaseClient();
+      if (!supabase) {
+        return false;
+      }
+
       try {
-        const response = await fetch(`${API_BASE_URL}/health`);
-        const data = await response.json();
-        return data.database === 'connected';
+        // Try a simple query
+        const { error } = await supabase.from('messages').select('id').limit(1);
+        return !error;
       } catch (error) {
         return false;
       }
@@ -126,83 +133,89 @@
 
     async function loadAnalytics() {
       const tbody = document.getElementById('messages-table');
+      const supabase = getSupabaseClient();
       
-      // Check server connection first
-      const isConnected = await checkServerConnection();
-      if (!isConnected) {
+      if (!supabase) {
         document.getElementById('total-views').textContent = 'Error';
         document.getElementById('unique-visitors').textContent = 'Error';
         document.getElementById('total-messages').textContent = 'Error';
-        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-danger">⚠️ Backend server is not running. Please start the server with: <code>npm start</code> in the backend folder</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-danger">⚠️ Supabase client not initialized. Please check your configuration.</td></tr>';
         
         const statusDiv = document.getElementById('connection-status');
         statusDiv.className = 'alert alert-danger';
         statusDiv.style.display = 'block';
-        document.getElementById('status-message').textContent = '❌ Cannot connect to backend server. Make sure it\'s running on http://localhost:3000';
+        document.getElementById('status-message').textContent = '❌ Cannot connect to Supabase. Please check your configuration.';
+        return;
+      }
+
+      // Check connection
+      const isConnected = await checkDatabaseConnection();
+      if (!isConnected) {
+        document.getElementById('total-views').textContent = 'Error';
+        document.getElementById('unique-visitors').textContent = 'Error';
+        document.getElementById('total-messages').textContent = 'Error';
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-danger">⚠️ Cannot connect to database. Please check your Supabase configuration and ensure tables are created.</td></tr>';
+        
+        const statusDiv = document.getElementById('connection-status');
+        statusDiv.className = 'alert alert-danger';
+        statusDiv.style.display = 'block';
+        document.getElementById('status-message').textContent = '❌ Cannot connect to Supabase database.';
         return;
       }
 
       try {
         // Load analytics data
-        const analyticsResponse = await fetch(`${API_BASE_URL}/views/analytics`);
-        
-        if (!analyticsResponse.ok) {
-          const errorText = await analyticsResponse.text();
-          console.error('Analytics API error:', errorText);
-          throw new Error(`HTTP error! status: ${analyticsResponse.status} - ${errorText}`);
-        }
-        
-        const analyticsData = await analyticsResponse.json();
-        console.log('Analytics data received:', analyticsData);
+        const [viewsResult, visitorsResult, messagesResult, analyticsResult] = await Promise.all([
+          supabase.from('profile_views').select('*', { count: 'exact', head: true }),
+          supabase.from('visitors').select('*', { count: 'exact', head: true }),
+          supabase.from('messages').select('*', { count: 'exact', head: true }),
+          supabase.from('analytics').select('*').order('date', { ascending: false }).limit(30)
+        ]);
 
-        if (analyticsData.success) {
-          // Display totals (will show 0 if no data yet)
-          document.getElementById('total-views').textContent = (analyticsData.totals?.views || 0).toLocaleString();
-          document.getElementById('unique-visitors').textContent = (analyticsData.totals?.visitors || 0).toLocaleString();
-          document.getElementById('total-messages').textContent = (analyticsData.totals?.messages || 0).toLocaleString();
-          
-          // Show success status
-          const statusDiv = document.getElementById('connection-status');
-          statusDiv.className = 'alert alert-success';
-          statusDiv.style.display = 'block';
-          document.getElementById('status-message').textContent = '✅ Connected to database successfully!';
-        } else {
-          throw new Error(analyticsData.message || 'Failed to load analytics data');
-        }
+        if (viewsResult.error) throw viewsResult.error;
+        if (visitorsResult.error) throw visitorsResult.error;
+        if (messagesResult.error) throw messagesResult.error;
+
+        // Display totals
+        document.getElementById('total-views').textContent = (viewsResult.count || 0).toLocaleString();
+        document.getElementById('unique-visitors').textContent = (visitorsResult.count || 0).toLocaleString();
+        document.getElementById('total-messages').textContent = (messagesResult.count || 0).toLocaleString();
+        
+        // Show success status
+        const statusDiv = document.getElementById('connection-status');
+        statusDiv.className = 'alert alert-success';
+        statusDiv.style.display = 'block';
+        document.getElementById('status-message').textContent = '✅ Connected to Supabase database successfully!';
 
         // Load messages
-        const messagesResponse = await fetch(`${API_BASE_URL}/messages`);
-        
-        if (!messagesResponse.ok) {
-          const errorText = await messagesResponse.text();
-          console.error('Messages API error:', errorText);
-          throw new Error(`HTTP error! status: ${messagesResponse.status} - ${errorText}`);
-        }
-        
-        const messagesData = await messagesResponse.json();
-        console.log('Messages data received:', messagesData);
+        const { data: messagesData, error: messagesError } = await supabase
+          .from('messages')
+          .select('*')
+          .order('created_at', { ascending: false });
 
-        if (messagesData.success) {
-          if (!messagesData.messages || messagesData.messages.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="8" class="text-center text-info">📭 No messages yet. Messages will appear here when someone contacts you through the portfolio.</td></tr>';
-          } else {
-            tbody.innerHTML = messagesData.messages.map(msg => {
-              // Escape HTML and prepare message for display
-              const escapeHtml = (text) => {
-                if (!text) return '';
-                const div = document.createElement('div');
-                div.textContent = text;
-                return div.innerHTML;
-              };
-              
-              const messagePreview = msg.message ? (msg.message.length > 50 ? msg.message.substring(0, 50) + '...' : msg.message) : 'No message';
-              const safeMessage = escapeHtml(msg.message || '');
-              const safeName = escapeHtml(msg.name || '');
-              const safeEmail = escapeHtml(msg.email || '');
-              const safeSubject = escapeHtml(msg.subject || 'No Subject');
-              
-              // Store message data in data attributes for safer handling
-              return `
+        if (messagesError) {
+          throw messagesError;
+        }
+
+        if (!messagesData || messagesData.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="8" class="text-center text-info">📭 No messages yet. Messages will appear here when someone contacts you through the portfolio.</td></tr>';
+        } else {
+          tbody.innerHTML = messagesData.map(msg => {
+            // Escape HTML
+            const escapeHtml = (text) => {
+              if (!text) return '';
+              const div = document.createElement('div');
+              div.textContent = text;
+              return div.innerHTML;
+            };
+            
+            const messagePreview = msg.message ? (msg.message.length > 50 ? msg.message.substring(0, 50) + '...' : msg.message) : 'No message';
+            const safeMessage = escapeHtml(msg.message || '');
+            const safeName = escapeHtml(msg.name || '');
+            const safeEmail = escapeHtml(msg.email || '');
+            const safeSubject = escapeHtml(msg.subject || 'No Subject');
+            
+            return `
               <tr class="${msg.read_status ? '' : 'table-warning'}" data-message-id="${msg.id}">
                 <td>${msg.id}</td>
                 <td>${safeName}</td>
@@ -231,33 +244,23 @@
                 </td>
               </tr>
             `;
-            }).join('');
-            
-            // Store messages data globally for modal access
-            window.messagesData = messagesData.messages;
-          }
-        } else {
-          throw new Error('Failed to load messages');
+          }).join('');
+          
+          // Store messages data globally for modal access
+          window.messagesData = messagesData;
         }
       } catch (error) {
         console.error('Error loading analytics:', error);
-        console.error('Error details:', {
-          message: error.message,
-          stack: error.stack,
-          name: error.name
-        });
         
         document.getElementById('total-views').textContent = 'Error';
         document.getElementById('unique-visitors').textContent = 'Error';
         document.getElementById('total-messages').textContent = 'Error';
         
         let errorMessage = `⚠️ Error: ${error.message}`;
-        if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
-          errorMessage += '<br>❌ Cannot connect to backend server. Make sure it\'s running on http://localhost:3000';
-        } else if (error.message.includes('JSON')) {
-          errorMessage += '<br>❌ Invalid response from server. Check server logs.';
-        } else {
-          errorMessage += '<br>❌ Check browser console (F12) for more details.';
+        if (error.message.includes('relation') || error.message.includes('does not exist')) {
+          errorMessage += '<br>❌ Database tables not found. Please run the SQL migration in your Supabase dashboard.';
+        } else if (error.message.includes('permission') || error.message.includes('policy')) {
+          errorMessage += '<br>❌ Permission denied. Please check your Supabase Row Level Security (RLS) policies.';
         }
         
         tbody.innerHTML = `<tr><td colspan="8" class="text-center text-danger">${errorMessage}</td></tr>`;
@@ -265,14 +268,16 @@
     }
 
     // Load data on page load
-    document.addEventListener('DOMContentLoaded', loadAnalytics);
+    document.addEventListener('DOMContentLoaded', function() {
+      // Wait for Supabase to initialize
+      setTimeout(loadAnalytics, 500);
+    });
 
     // Auto-refresh every 30 seconds
     setInterval(loadAnalytics, 30000);
 
     // Show full message in modal
     function showMessageModal(messageId) {
-      // Find message from stored data
       const message = window.messagesData?.find(msg => msg.id === messageId);
       if (!message) {
         alert('Message not found');
@@ -340,23 +345,29 @@
       bsModal.show();
     }
 
-
     // Mark message as read
     async function markAsRead(messageId) {
-      try {
-        const response = await fetch(`${API_BASE_URL}/messages/${messageId}/read`, {
-          method: 'PATCH'
-        });
+      const supabase = getSupabaseClient();
+      if (!supabase) {
+        alert('Supabase client not initialized');
+        return;
+      }
 
-        if (response.ok) {
-          // Reload messages
-          loadAnalytics();
-        } else {
-          alert('Failed to mark message as read');
+      try {
+        const { error } = await supabase
+          .from('messages')
+          .update({ read_status: true })
+          .eq('id', messageId);
+
+        if (error) {
+          throw error;
         }
+
+        // Reload messages
+        loadAnalytics();
       } catch (error) {
         console.error('Error marking message as read:', error);
-        alert('Error marking message as read');
+        alert('Error marking message as read: ' + error.message);
       }
     }
 
@@ -366,24 +377,30 @@
         return;
       }
 
-      try {
-        const response = await fetch(`${API_BASE_URL}/messages/${messageId}`, {
-          method: 'DELETE'
-        });
+      const supabase = getSupabaseClient();
+      if (!supabase) {
+        alert('Supabase client not initialized');
+        return;
+      }
 
-        if (response.ok) {
-          // Reload messages
-          loadAnalytics();
-        } else {
-          alert('Failed to delete message');
+      try {
+        const { error } = await supabase
+          .from('messages')
+          .delete()
+          .eq('id', messageId);
+
+        if (error) {
+          throw error;
         }
+
+        // Reload messages
+        loadAnalytics();
       } catch (error) {
         console.error('Error deleting message:', error);
-        alert('Error deleting message');
+        alert('Error deleting message: ' + error.message);
       }
     }
   </script>
   
 </body>
 </html>
-

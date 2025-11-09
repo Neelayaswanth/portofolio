@@ -1,7 +1,7 @@
 /**
  * Custom Cursor Effect
  * Inspired by https://azumbrunnen.me/
- * Creates a smooth following cursor effect
+ * Creates a smooth following cursor effect that fills elements on hover
  */
 
 (function() {
@@ -21,10 +21,16 @@
 
   let mouseX = 0;
   let mouseY = 0;
-  let cursorX = 0;
-  let cursorY = 0;
   let followerX = 0;
   let followerY = 0;
+  let currentHoverElement = null;
+  let targetWidth = 40;
+  let targetHeight = 40;
+  let currentWidth = 40;
+  let currentHeight = 40;
+  let targetX = 0;
+  let targetY = 0;
+  let isHovering = false;
 
   // Update mouse position
   document.addEventListener('mousemove', (e) => {
@@ -34,16 +40,29 @@
     // Update cursor immediately
     cursor.style.left = mouseX + 'px';
     cursor.style.top = mouseY + 'px';
+    
+    // Update target position for follower
+    if (!isHovering) {
+      targetX = mouseX;
+      targetY = mouseY;
+    }
   });
 
   // Smooth animation for follower
   function animateCursor() {
     // Smooth cursor follower movement
-    followerX += (mouseX - followerX) * 0.15;
-    followerY += (mouseY - followerY) * 0.15;
+    followerX += (targetX - followerX) * 0.15;
+    followerY += (targetY - followerY) * 0.15;
+    
+    // Smooth size transition
+    currentWidth += (targetWidth - currentWidth) * 0.2;
+    currentHeight += (targetHeight - currentHeight) * 0.2;
     
     cursorFollower.style.left = followerX + 'px';
     cursorFollower.style.top = followerY + 'px';
+    cursorFollower.style.width = currentWidth + 'px';
+    cursorFollower.style.height = currentHeight + 'px';
+    cursorFollower.style.borderRadius = isHovering ? '8px' : '50%';
     
     requestAnimationFrame(animateCursor);
   }
@@ -51,50 +70,105 @@
   // Start animation
   animateCursor();
 
-  // Hover effects on interactive elements using event delegation
-  function isInteractiveElement(element) {
-    if (!element) return false;
+  // Find the hoverable element (closest interactive element)
+  function findHoverableElement(element) {
+    if (!element) return null;
     
+    // Check if element itself is interactive
     const tagName = element.tagName.toLowerCase();
     const interactiveTags = ['a', 'button', 'input', 'textarea', 'select'];
     
-    if (interactiveTags.includes(tagName)) return true;
-    if (element.hasAttribute('role') && element.getAttribute('role') === 'button') return true;
-    if (element.classList.contains('btn')) return true;
-    if (element.classList.contains('portfolio-wrap')) return true;
-    if (element.classList.contains('service-card')) return true;
-    if (element.classList.contains('scroll-top')) return true;
-    if (element.classList.contains('portfolio-item')) return true;
-    if (element.classList.contains('card-action')) return true;
-    if (element.closest('.navmenu')) return true;
+    if (interactiveTags.includes(tagName)) return element;
+    if (element.hasAttribute('role') && element.getAttribute('role') === 'button') return element;
     
-    return false;
+    // Check for interactive classes
+    const interactiveClasses = [
+      'btn', 'portfolio-wrap', 'service-card', 'scroll-top', 
+      'portfolio-item', 'card-action', 'portfolio-links',
+      'navmenu', 'resume-item', 'skill-item', 'stat-card'
+    ];
+    
+    for (const className of interactiveClasses) {
+      if (element.classList.contains(className)) return element;
+      const parent = element.closest('.' + className);
+      if (parent) return parent;
+    }
+    
+    // Check for links and buttons in parent
+    const linkOrButton = element.closest('a, button, .btn');
+    if (linkOrButton) return linkOrButton;
+    
+    // Check navigation menu
+    if (element.closest('.navmenu')) {
+      return element.closest('.navmenu a') || element.closest('.navmenu');
+    }
+    
+    return null;
   }
 
-  // Use event delegation for better performance
+  // Handle mouseover - expand cursor to fill element
   document.addEventListener('mouseover', (e) => {
-    if (isInteractiveElement(e.target) || isInteractiveElement(e.target.closest('a, button, .btn'))) {
+    const hoverableElement = findHoverableElement(e.target);
+    
+    if (hoverableElement && hoverableElement !== currentHoverElement) {
+      currentHoverElement = hoverableElement;
+      isHovering = true;
+      
+      // Get element's bounding box
+      const rect = hoverableElement.getBoundingClientRect();
+      const padding = 10; // Add some padding
+      
+      // Calculate target size and position
+      targetWidth = rect.width + (padding * 2);
+      targetHeight = rect.height + (padding * 2);
+      targetX = rect.left + (rect.width / 2);
+      targetY = rect.top + (rect.height / 2);
+      
+      // Add hover class
       cursor.classList.add('hover');
       cursorFollower.classList.add('hover');
+      cursorFollower.setAttribute('data-filling', 'true');
     }
   });
 
+  // Handle mouseout - shrink cursor back
   document.addEventListener('mouseout', (e) => {
-    if (isInteractiveElement(e.target) || isInteractiveElement(e.target.closest('a, button, .btn'))) {
-      cursor.classList.remove('hover');
-      cursorFollower.classList.remove('hover');
+    const hoverableElement = findHoverableElement(e.target);
+    
+    if (hoverableElement === currentHoverElement) {
+      // Check if we're actually leaving the element
+      const relatedTarget = e.relatedTarget;
+      if (!relatedTarget || !hoverableElement.contains(relatedTarget)) {
+        currentHoverElement = null;
+        isHovering = false;
+        
+        // Reset to normal size
+        targetWidth = 40;
+        targetHeight = 40;
+        targetX = mouseX;
+        targetY = mouseY;
+        
+        // Remove hover class
+        cursor.classList.remove('hover');
+        cursorFollower.classList.remove('hover');
+        cursorFollower.removeAttribute('data-filling');
+      }
     }
   });
 
   // Click effect
   document.addEventListener('mousedown', () => {
     cursor.style.transform = 'translate(-50%, -50%) scale(0.8)';
-    cursorFollower.style.transform = 'translate(-50%, -50%) scale(0.9)';
+    if (!isHovering) {
+      cursorFollower.style.transform = 'translate(-50%, -50%) scale(0.9)';
+    }
   });
 
   document.addEventListener('mouseup', () => {
     cursor.style.transform = 'translate(-50%, -50%) scale(1)';
-    cursorFollower.style.transform = 'translate(-50%, -50%) scale(1)';
+    if (!isHovering) {
+      cursorFollower.style.transform = 'translate(-50%, -50%) scale(1)';
+    }
   });
 
   // Hide cursor when mouse leaves window
@@ -120,7 +194,19 @@
         cursor.style.display = 'block';
         cursorFollower.style.display = 'block';
       }
+      
+      // Reset hover state on resize
+      if (isHovering) {
+        currentHoverElement = null;
+        isHovering = false;
+        targetWidth = 40;
+        targetHeight = 40;
+        targetX = mouseX;
+        targetY = mouseY;
+        cursor.classList.remove('hover');
+        cursorFollower.classList.remove('hover');
+        cursorFollower.removeAttribute('data-filling');
+      }
     }, 250);
   });
 })();
-

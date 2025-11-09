@@ -363,10 +363,19 @@ document.addEventListener('DOMContentLoaded', function() {
   setTimeout(tryInitialize, 500);
 
   // Handle contact form submission
-  const contactForm = document.querySelector('.php-email-form');
-  if (contactForm) {
-    contactForm.addEventListener('submit', async function(e) {
-      e.preventDefault();
+  // Wait a bit to ensure validate.js (if present) doesn't interfere
+  setTimeout(function() {
+    const contactForm = document.querySelector('.php-email-form');
+    if (contactForm) {
+      // Remove any existing event listeners by cloning the form
+      const newForm = contactForm.cloneNode(true);
+      contactForm.parentNode.replaceChild(newForm, contactForm);
+      
+      // Add our event listener with highest priority (capture phase)
+      newForm.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
 
       const form = e.target;
       const submitButton = form.querySelector('button[type="submit"]');
@@ -483,8 +492,9 @@ document.addEventListener('DOMContentLoaded', function() {
           sentMessage.style.display = 'none';
         }
       }
-    });
-  }
+    }, true); // Use capture phase to run before other handlers
+    }
+  }, 100);
 });
 
 // Export functions for use in other scripts

@@ -79,7 +79,33 @@
   // Start animation
   animateCursor();
 
-  // Find the hoverable element (closest interactive element)
+  // Check if element is text content
+  function isTextElement(element) {
+    if (!element) return false;
+    
+    const textTags = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'span', 'li', 'td', 'th', 'label', 'strong', 'em', 'b', 'i', 'a'];
+    const tagName = element.tagName.toLowerCase();
+    
+    // Check if it's a text tag
+    if (textTags.includes(tagName)) return true;
+    
+    // Check if it contains text and is not an interactive element
+    const hasText = element.textContent && element.textContent.trim().length > 0;
+    const isInteractive = ['a', 'button', 'input', 'textarea', 'select'].includes(tagName);
+    
+    // If it has text and is not already an interactive element, treat as text
+    if (hasText && !isInteractive) {
+      // Check if parent is a text container
+      const parent = element.parentElement;
+      if (parent && textTags.includes(parent.tagName.toLowerCase())) {
+        return true;
+      }
+    }
+    
+    return false;
+  }
+
+  // Find the hoverable element (closest interactive element or text)
   function findHoverableElement(element) {
     if (!element) return null;
     
@@ -113,6 +139,11 @@
       return element.closest('.navmenu a') || element.closest('.navmenu');
     }
     
+    // Check if it's a text element
+    if (isTextElement(element)) {
+      return element;
+    }
+    
     return null;
   }
 
@@ -126,7 +157,10 @@
       
       // Get element's bounding box
       const rect = hoverableElement.getBoundingClientRect();
-      const padding = 12;
+      const isText = isTextElement(hoverableElement);
+      
+      // Different padding for text vs interactive elements
+      const padding = isText ? 8 : 12;
       
       // Calculate target size and position
       targetWidth = rect.width + (padding * 2);
@@ -134,12 +168,17 @@
       targetX = rect.left + (rect.width / 2);
       targetY = rect.top + (rect.height / 2);
       
-      // Change to orange border only when hovering (no fill)
+      // Change to orange border when hovering
       cursorFollower.style.borderColor = hoverColor;
       
-      // Add hover class
+      // Add hover class and text class if it's text
       cursor.classList.add('hover');
       cursorFollower.classList.add('hover');
+      if (isText) {
+        cursorFollower.classList.add('text-hover');
+      } else {
+        cursorFollower.classList.remove('text-hover');
+      }
       cursorFollower.setAttribute('data-filling', 'true');
     }
   });
@@ -167,6 +206,7 @@
         // Remove hover class
         cursor.classList.remove('hover');
         cursorFollower.classList.remove('hover');
+        cursorFollower.classList.remove('text-hover');
         cursorFollower.removeAttribute('data-filling');
       }
     }
@@ -221,6 +261,7 @@
         targetY = mouseY;
         cursor.classList.remove('hover');
         cursorFollower.classList.remove('hover');
+        cursorFollower.classList.remove('text-hover');
         cursorFollower.removeAttribute('data-filling');
         cursorFollower.style.borderColor = defaultColor;
       }

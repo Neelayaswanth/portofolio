@@ -2610,6 +2610,12 @@ section,
   border-width: 1px;
 }
 
+.custom-cursor-follower.text-hover {
+  background-color: rgba(255, 146, 43, 0.1);
+  border-width: 1px;
+  mix-blend-mode: normal;
+}
+
 /* Cursor filling effect is handled by JavaScript */
 
 /* Hide cursor on mobile devices */

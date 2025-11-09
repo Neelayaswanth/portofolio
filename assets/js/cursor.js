@@ -21,6 +21,8 @@
 
   let mouseX = 0;
   let mouseY = 0;
+  let cursorX = 0;
+  let cursorY = 0;
   let followerX = 0;
   let followerY = 0;
   let currentHoverElement = null;
@@ -31,38 +33,98 @@
   let targetX = 0;
   let targetY = 0;
   let isHovering = false;
+  let velocityX = 0;
+  let velocityY = 0;
+  let rotation = 0;
+  let targetRotation = 0;
 
-  // Update mouse position
+  // Update mouse position with velocity calculation
+  let lastMouseX = 0;
+  let lastMouseY = 0;
+  
   document.addEventListener('mousemove', (e) => {
     mouseX = e.clientX;
     mouseY = e.clientY;
     
-    // Update cursor immediately
-    cursor.style.left = mouseX + 'px';
-    cursor.style.top = mouseY + 'px';
+    // Calculate velocity for dynamic effects
+    const deltaX = mouseX - lastMouseX;
+    const deltaY = mouseY - lastMouseY;
+    const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
     
-    // Update target position for follower
+    velocityX = deltaX * 0.5;
+    velocityY = deltaY * 0.5;
+    
+    // Add slight rotation based on movement
+    if (distance > 0) {
+      targetRotation += distance * 0.1;
+    }
+    
+    lastMouseX = mouseX;
+    lastMouseY = mouseY;
+    
+    // Update cursor with slight delay for more dynamic feel
     if (!isHovering) {
       targetX = mouseX;
       targetY = mouseY;
     }
   });
 
-  // Smooth animation for follower
+  // Smooth animation for follower with spring physics
   function animateCursor() {
-    // Smooth cursor follower movement
-    followerX += (targetX - followerX) * 0.15;
-    followerY += (targetY - followerY) * 0.15;
+    // Spring physics for smoother, more dynamic movement
+    const spring = 0.15;
+    const friction = 0.85;
     
-    // Smooth size transition
-    currentWidth += (targetWidth - currentWidth) * 0.2;
-    currentHeight += (targetHeight - currentHeight) * 0.2;
+    // Calculate distance and apply spring force
+    const dx = targetX - followerX;
+    const dy = targetY - followerY;
     
+    // Apply spring physics
+    velocityX += dx * spring;
+    velocityY += dy * spring;
+    
+    // Apply friction
+    velocityX *= friction;
+    velocityY *= friction;
+    
+    // Update position
+    followerX += velocityX;
+    followerY += velocityY;
+    
+    // Smooth size transition with easing
+    const sizeDiffX = targetWidth - currentWidth;
+    const sizeDiffY = targetHeight - currentHeight;
+    currentWidth += sizeDiffX * 0.25;
+    currentHeight += sizeDiffY * 0.25;
+    
+    // Smooth rotation
+    rotation += (targetRotation - rotation) * 0.1;
+    
+    // Apply transformations
     cursorFollower.style.left = followerX + 'px';
     cursorFollower.style.top = followerY + 'px';
     cursorFollower.style.width = currentWidth + 'px';
     cursorFollower.style.height = currentHeight + 'px';
     cursorFollower.style.borderRadius = isHovering ? '8px' : '50%';
+    
+    // Add subtle rotation for dynamic feel
+    if (!isHovering && Math.abs(velocityX) > 0.1 || Math.abs(velocityY) > 0.1) {
+      cursorFollower.style.transform = `translate(-50%, -50%) rotate(${rotation * 0.1}deg)`;
+    } else {
+      cursorFollower.style.transform = 'translate(-50%, -50%)';
+    }
+    
+    // Update cursor position with slight delay for trailing effect
+    cursorX += (mouseX - cursorX) * 0.3;
+    cursorY += (mouseY - cursorY) * 0.3;
+    
+    cursor.style.left = cursorX + 'px';
+    cursor.style.top = cursorY + 'px';
+    
+    // Add subtle scale based on velocity for dynamic feel
+    const velocity = Math.sqrt(velocityX * velocityX + velocityY * velocityY);
+    const scale = 1 + Math.min(velocity * 0.01, 0.3);
+    cursor.style.transform = `translate(-50%, -50%) scale(${scale})`;
     
     requestAnimationFrame(animateCursor);
   }
@@ -116,7 +178,7 @@
       
       // Get element's bounding box
       const rect = hoverableElement.getBoundingClientRect();
-      const padding = 10; // Add some padding
+      const padding = 12; // Add some padding
       
       // Calculate target size and position
       targetWidth = rect.width + (padding * 2);
@@ -124,10 +186,17 @@
       targetX = rect.left + (rect.width / 2);
       targetY = rect.top + (rect.height / 2);
       
-      // Add hover class
+      // Reset velocity for smooth transition
+      velocityX = 0;
+      velocityY = 0;
+      
+      // Add hover class with animation
       cursor.classList.add('hover');
       cursorFollower.classList.add('hover');
       cursorFollower.setAttribute('data-filling', 'true');
+      
+      // Add pulse effect
+      cursorFollower.style.transition = 'background-color 0.3s ease-out, border-color 0.3s ease-out';
     }
   });
 
@@ -142,7 +211,7 @@
         currentHoverElement = null;
         isHovering = false;
         
-        // Reset to normal size
+        // Reset to normal size with smooth transition
         targetWidth = 40;
         targetHeight = 40;
         targetX = mouseX;
@@ -152,22 +221,49 @@
         cursor.classList.remove('hover');
         cursorFollower.classList.remove('hover');
         cursorFollower.removeAttribute('data-filling');
+        
+        // Reset rotation
+        targetRotation = rotation;
       }
     }
   });
 
-  // Click effect
+  // Click effect with bounce animation
   document.addEventListener('mousedown', () => {
-    cursor.style.transform = 'translate(-50%, -50%) scale(0.8)';
+    cursor.style.transition = 'transform 0.1s cubic-bezier(0.68, -0.55, 0.265, 1.55)';
+    cursor.style.transform = 'translate(-50%, -50%) scale(0.7)';
+    
     if (!isHovering) {
-      cursorFollower.style.transform = 'translate(-50%, -50%) scale(0.9)';
+      cursorFollower.style.transition = 'transform 0.15s cubic-bezier(0.68, -0.55, 0.265, 1.55)';
+      cursorFollower.style.transform = 'translate(-50%, -50%) scale(0.85)';
+    } else {
+      // Slight shrink when clicking on filled element
+      cursorFollower.style.transition = 'transform 0.1s ease-out';
+      cursorFollower.style.transform = 'translate(-50%, -50%) scale(0.95)';
     }
   });
 
   document.addEventListener('mouseup', () => {
-    cursor.style.transform = 'translate(-50%, -50%) scale(1)';
+    cursor.style.transition = 'transform 0.2s cubic-bezier(0.68, -0.55, 0.265, 1.55)';
+    cursor.style.transform = 'translate(-50%, -50%) scale(1.1)';
+    
+    // Bounce back effect
+    setTimeout(() => {
+      cursor.style.transition = 'transform 0.15s ease-out';
+      cursor.style.transform = 'translate(-50%, -50%) scale(1)';
+    }, 100);
+    
     if (!isHovering) {
-      cursorFollower.style.transform = 'translate(-50%, -50%) scale(1)';
+      cursorFollower.style.transition = 'transform 0.2s cubic-bezier(0.68, -0.55, 0.265, 1.55)';
+      cursorFollower.style.transform = 'translate(-50%, -50%) scale(1.05)';
+      
+      setTimeout(() => {
+        cursorFollower.style.transition = 'transform 0.15s ease-out';
+        cursorFollower.style.transform = 'translate(-50%, -50%)';
+      }, 100);
+    } else {
+      cursorFollower.style.transition = 'transform 0.15s ease-out';
+      cursorFollower.style.transform = 'translate(-50%, -50%)';
     }
   });
 

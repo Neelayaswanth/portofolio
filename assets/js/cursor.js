@@ -223,10 +223,13 @@
         cursorFollower.style.borderColor = hoverColor;
         cursorFollower.style.opacity = '1';
         
+        // Remove glassy effect for interactive elements (so buttons are visible)
+        cursorFollower.classList.add('no-glass');
+        
         // Reset cursor to normal dot
         cursor.classList.remove('text-cursor');
-        cursor.style.width = '8px';
-        cursor.style.height = '8px';
+        cursor.style.width = '6px';
+        cursor.style.height = '6px';
         cursor.style.borderRadius = '50%';
         cursor.style.backgroundColor = defaultColor;
         cursor.style.transform = 'translate(-50%, -50%)';

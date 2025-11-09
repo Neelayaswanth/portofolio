@@ -48,15 +48,24 @@ function getSupabaseClient() {
   return initSupabaseClient();
 }
 
-// Initialize when DOM is ready
+// Initialize when DOM is ready and library is loaded
+function waitForSupabaseLibrary() {
+  if (typeof supabase !== 'undefined') {
+    initSupabaseClient();
+  } else {
+    // Retry after a short delay
+    setTimeout(waitForSupabaseLibrary, 100);
+  }
+}
+
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', function() {
-    // Wait a bit for the library to load
-    setTimeout(initSupabaseClient, 100);
+    // Wait for library to load
+    waitForSupabaseLibrary();
   });
 } else {
-  // DOM already loaded, try to initialize after a short delay
-  setTimeout(initSupabaseClient, 100);
+  // DOM already loaded
+  waitForSupabaseLibrary();
 }
 
 // Export for use in other scripts

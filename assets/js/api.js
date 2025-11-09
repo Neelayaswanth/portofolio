@@ -233,12 +233,21 @@ async function updateViewCount() {
 
 // Submit contact form
 async function submitContactForm(formData) {
-  const supabase = getSupabaseClient();
+  // Wait for Supabase to be ready
+  let supabase = getSupabaseClient();
   if (!supabase) {
-    return {
-      success: false,
-      message: 'Database connection not available. Please try again later.'
-    };
+    // Try to initialize again
+    if (window.SupabaseConfig && window.SupabaseConfig.init) {
+      supabase = window.SupabaseConfig.init();
+    }
+    
+    if (!supabase) {
+      console.error('Supabase client not available');
+      return {
+        success: false,
+        message: 'Database connection not available. Please refresh the page and try again.'
+      };
+    }
   }
 
   try {
@@ -257,9 +266,22 @@ async function submitContactForm(formData) {
 
     if (error) {
       console.error('Error submitting message:', error);
+      
+      // Provide more helpful error messages
+      let errorMessage = 'Failed to send message. ';
+      if (error.message.includes('relation') || error.message.includes('does not exist')) {
+        errorMessage += 'Database tables not set up. Please contact the website administrator.';
+      } else if (error.message.includes('permission') || error.message.includes('policy')) {
+        errorMessage += 'Permission denied. Please check database permissions.';
+      } else if (error.message.includes('network') || error.message.includes('fetch')) {
+        errorMessage += 'Network error. Please check your internet connection.';
+      } else {
+        errorMessage += error.message || 'Please try again later.';
+      }
+      
       return {
         success: false,
-        message: error.message || 'Failed to send message. Please try again.'
+        message: errorMessage
       };
     }
 
@@ -300,25 +322,45 @@ async function submitContactForm(formData) {
     };
   } catch (error) {
     console.error('Error submitting form:', error);
+    
+    // Handle network errors specifically
+    let errorMessage = 'Failed to send message. ';
+    if (error.message && error.message.includes('fetch')) {
+      errorMessage += 'Network error. Please check your internet connection and try again.';
+    } else if (error.message && error.message.includes('Failed to fetch')) {
+      errorMessage += 'Unable to connect to the server. Please check your internet connection.';
+    } else {
+      errorMessage += error.message || 'An unexpected error occurred. Please try again later.';
+    }
+    
     return {
       success: false,
-      message: error.message || 'Network error. Please check your connection and try again.'
+      message: errorMessage
     };
   }
 }
 
 // Initialize API integration
 document.addEventListener('DOMContentLoaded', function() {
-  // Wait a bit for Supabase to initialize
-  setTimeout(() => {
+  // Wait for Supabase to initialize (with retries)
+  let retries = 0;
+  const maxRetries = 10;
+  
+  function tryInitialize() {
     const supabase = getSupabaseClient();
     if (supabase) {
       // Track profile view on page load
       trackProfileView();
+    } else if (retries < maxRetries) {
+      retries++;
+      setTimeout(tryInitialize, 200);
     } else {
-      console.warn('Supabase not initialized, skipping profile view tracking');
+      console.warn('Supabase not initialized after multiple attempts, skipping profile view tracking');
     }
-  }, 1000);
+  }
+  
+  // Start initialization after a short delay
+  setTimeout(tryInitialize, 500);
 
   // Handle contact form submission
   const contactForm = document.querySelector('.php-email-form');
@@ -372,6 +414,25 @@ document.addEventListener('DOMContentLoaded', function() {
 
       // Submit to Supabase
       try {
+        // Ensure Supabase is ready before submitting
+        let supabaseReady = getSupabaseClient();
+        if (!supabaseReady && window.SupabaseConfig && window.SupabaseConfig.init) {
+          supabaseReady = window.SupabaseConfig.init();
+        }
+        
+        if (!supabaseReady) {
+          if (errorMessage) {
+            errorMessage.innerHTML = 'Database connection not ready. Please wait a moment and try again.';
+            errorMessage.style.display = 'block';
+          }
+          if (loadingDiv) loadingDiv.style.display = 'none';
+          if (submitButton) {
+            submitButton.disabled = false;
+            submitButton.textContent = 'Send Message';
+          }
+          return;
+        }
+        
         const result = await submitContactForm(formData);
 
         // Hide loading

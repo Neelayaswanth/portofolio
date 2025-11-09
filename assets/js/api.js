@@ -363,21 +363,26 @@ document.addEventListener('DOMContentLoaded', function() {
   setTimeout(tryInitialize, 500);
 
   // Handle contact form submission
-  // Wait a bit to ensure validate.js (if present) doesn't interfere
-  setTimeout(function() {
-    const contactForm = document.querySelector('.php-email-form');
-    if (contactForm) {
-      // Remove any existing event listeners by cloning the form
-      const newForm = contactForm.cloneNode(true);
-      contactForm.parentNode.replaceChild(newForm, contactForm);
-      
-      // Add our event listener with highest priority (capture phase)
-      newForm.addEventListener('submit', async function(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        e.stopImmediatePropagation();
+  // Use a more reliable approach that works even if validate.js loads
+  function setupFormHandler() {
+    const contactForm = document.querySelector('.php-email-form[data-supabase-form]');
+    if (!contactForm) {
+      // Try again after a short delay if form not found
+      setTimeout(setupFormHandler, 100);
+      return;
+    }
 
-      const form = e.target;
+    // Remove the form's action to prevent any default submission
+    contactForm.setAttribute('action', 'javascript:void(0);');
+    contactForm.setAttribute('onsubmit', 'return false;');
+    
+    // Add our submit handler - use capture phase and make it non-removable
+    const formHandler = async function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+
+      const form = e.currentTarget || e.target;
       const submitButton = form.querySelector('button[type="submit"]');
       const loadingDiv = form.querySelector('.loading');
       const errorMessage = form.querySelector('.error-message');
@@ -411,11 +416,19 @@ document.addEventListener('DOMContentLoaded', function() {
       }
 
       // Hide previous messages
-      if (errorMessage) errorMessage.style.display = 'none';
-      if (sentMessage) sentMessage.style.display = 'none';
-      if (loadingDiv) loadingDiv.style.display = 'block';
+      if (errorMessage) {
+        errorMessage.style.display = 'none';
+        errorMessage.innerHTML = '';
+      }
+      if (sentMessage) {
+        sentMessage.style.display = 'none';
+      }
+      if (loadingDiv) {
+        loadingDiv.style.display = 'block';
+      }
       
       // Disable submit button
+      const originalButtonText = submitButton ? submitButton.textContent : 'Send Message';
       if (submitButton) {
         submitButton.disabled = true;
         submitButton.textContent = 'Sending...';
@@ -425,21 +438,21 @@ document.addEventListener('DOMContentLoaded', function() {
       try {
         // Ensure Supabase is ready before submitting
         let supabaseReady = getSupabaseClient();
-        if (!supabaseReady && window.SupabaseConfig && window.SupabaseConfig.init) {
-          supabaseReady = window.SupabaseConfig.init();
+        if (!supabaseReady) {
+          // Try to initialize
+          if (window.SupabaseConfig && window.SupabaseConfig.init) {
+            supabaseReady = window.SupabaseConfig.init();
+          }
+          
+          // If still not ready, wait a bit and try once more
+          if (!supabaseReady) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+            supabaseReady = getSupabaseClient();
+          }
         }
         
         if (!supabaseReady) {
-          if (errorMessage) {
-            errorMessage.innerHTML = 'Database connection not ready. Please wait a moment and try again.';
-            errorMessage.style.display = 'block';
-          }
-          if (loadingDiv) loadingDiv.style.display = 'none';
-          if (submitButton) {
-            submitButton.disabled = false;
-            submitButton.textContent = 'Send Message';
-          }
-          return;
+          throw new Error('Database connection not available. Please refresh the page and try again.');
         }
         
         const result = await submitContactForm(formData);
@@ -481,20 +494,32 @@ document.addEventListener('DOMContentLoaded', function() {
         if (loadingDiv) loadingDiv.style.display = 'none';
         if (submitButton) {
           submitButton.disabled = false;
-          submitButton.textContent = 'Send Message';
+          submitButton.textContent = originalButtonText;
         }
         // Show error
         if (errorMessage) {
-          errorMessage.innerHTML = 'Network error. Please check your connection and try again.';
+          const errorMsg = error.message || 'Network error. Please check your connection and try again.';
+          errorMessage.innerHTML = errorMsg;
           errorMessage.style.display = 'block';
         }
         if (sentMessage) {
           sentMessage.style.display = 'none';
         }
       }
-    }, true); // Use capture phase to run before other handlers
-    }
-  }, 100);
+    };
+    
+    // Attach handler in capture phase (runs first) and as non-removable
+    contactForm.addEventListener('submit', formHandler, {
+      capture: true,
+      passive: false,
+      once: false
+    });
+    
+    console.log('✓ Contact form handler attached to Supabase');
+  }
+  
+  // Setup form handler after DOM is ready
+  setupFormHandler();
 });
 
 // Export functions for use in other scripts

@@ -269,12 +269,13 @@
         cursor.classList.remove('text-cursor');
         cursorFollower.classList.remove('hover');
         cursorFollower.classList.remove('text-hover');
+        cursorFollower.classList.remove('no-glass');
         cursorFollower.removeAttribute('data-filling');
         
         // Reset cursor to normal
         cursorFollower.style.opacity = '1';
-        cursor.style.width = '8px';
-        cursor.style.height = '8px';
+        cursor.style.width = '6px';
+        cursor.style.height = '6px';
         cursor.style.borderRadius = '50%';
         cursor.style.backgroundColor = defaultColor;
       }
@@ -332,13 +333,14 @@
         cursor.classList.remove('text-cursor');
         cursorFollower.classList.remove('hover');
         cursorFollower.classList.remove('text-hover');
+        cursorFollower.classList.remove('no-glass');
         cursorFollower.removeAttribute('data-filling');
         cursorFollower.style.borderColor = defaultColor;
         
         // Reset cursor to normal
         cursorFollower.style.opacity = '1';
-        cursor.style.width = '8px';
-        cursor.style.height = '8px';
+        cursor.style.width = '6px';
+        cursor.style.height = '6px';
         cursor.style.borderRadius = '50%';
         cursor.style.backgroundColor = defaultColor;
       }

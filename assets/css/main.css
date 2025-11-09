@@ -2548,3 +2548,97 @@ section,
 .starter-section {
   /* Add your styles here */
 }
+
+/*--------------------------------------------------------------
+# Custom Cursor (Inspired by azumbrunnen.me)
+--------------------------------------------------------------*/
+.custom-cursor,
+.custom-cursor-follower {
+  position: fixed;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 9999;
+  mix-blend-mode: difference;
+  transition: transform 0.1s ease-out;
+}
+
+.custom-cursor {
+  width: 8px;
+  height: 8px;
+  background-color: #ececec;
+  transform: translate(-50%, -50%);
+  will-change: transform;
+}
+
+.custom-cursor-follower {
+  width: 40px;
+  height: 40px;
+  border: 1px solid #ececec;
+  background-color: transparent;
+  transform: translate(-50%, -50%);
+  transition: width 0.3s ease-out, height 0.3s ease-out, border-color 0.3s ease-out;
+  will-change: transform, width, height;
+}
+
+/* Hide default cursor on desktop */
+@media (min-width: 992px) {
+  body {
+    cursor: none;
+  }
+  
+  * {
+    cursor: none !important;
+  }
+}
+
+/* Cursor hover effects */
+.custom-cursor.hover,
+.custom-cursor-follower.hover {
+  transform: translate(-50%, -50%) scale(1.5);
+}
+
+.custom-cursor-follower.hover {
+  width: 60px;
+  height: 60px;
+  border-color: #ececec;
+  background-color: rgba(236, 236, 236, 0.1);
+}
+
+/* Cursor on clickable elements */
+a:hover ~ .custom-cursor,
+button:hover ~ .custom-cursor,
+.btn:hover ~ .custom-cursor,
+input:hover ~ .custom-cursor,
+textarea:hover ~ .custom-cursor,
+select:hover ~ .custom-cursor,
+[role="button"]:hover ~ .custom-cursor {
+  transform: translate(-50%, -50%) scale(1.3);
+}
+
+a:hover ~ .custom-cursor-follower,
+button:hover ~ .custom-cursor-follower,
+.btn:hover ~ .custom-cursor-follower,
+input:hover ~ .custom-cursor-follower,
+textarea:hover ~ .custom-cursor-follower,
+select:hover ~ .custom-cursor-follower,
+[role="button"]:hover ~ .custom-cursor-follower {
+  width: 50px;
+  height: 50px;
+  border-color: #ececec;
+}
+
+/* Hide cursor on mobile devices */
+@media (max-width: 991px) {
+  .custom-cursor,
+  .custom-cursor-follower {
+    display: none;
+  }
+  
+  body {
+    cursor: auto;
+  }
+  
+  * {
+    cursor: auto !important;
+  }
+}

@@ -2568,8 +2568,32 @@ section,
   background-color: #ececec;
   transform: translate(-50%, -50%);
   will-change: transform;
-  transition: background-color 0.3s ease, transform 0.2s ease;
+  transition: background-color 0.3s ease, 
+              transform 0.2s ease,
+              width 0.2s ease,
+              height 0.2s ease,
+              border-radius 0.2s ease;
   border-radius: 50%;
+  box-shadow: 0 0 8px rgba(236, 236, 236, 0.8);
+  z-index: 999999;
+}
+
+.custom-cursor.text-cursor {
+  width: 2px;
+  min-height: 16px;
+  background-color: #ff922b;
+  border-radius: 1px;
+  animation: textCursorBlink 1s infinite;
+  transition: height 0.2s ease;
+}
+
+@keyframes textCursorBlink {
+  0%, 50% {
+    opacity: 1;
+  }
+  51%, 100% {
+    opacity: 0.3;
+  }
 }
 
 .custom-cursor-follower {

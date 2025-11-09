@@ -1,7 +1,6 @@
 /**
  * Custom Cursor Effect
- * Inspired by https://azumbrunnen.me/
- * Creates a smooth following cursor effect that fills elements on hover
+ * Text cursor for text elements, normal cursor for buttons and navigation
  */
 
 (function() {
@@ -31,8 +30,62 @@
   let targetX = 0;
   let targetY = 0;
   let isHovering = false;
+  let isTextMode = false;
   const defaultColor = '#ececec';
   const hoverColor = '#ff922b'; // Orange
+
+  // Check if element is text content (not button, nav, or interactive)
+  function isTextElement(element) {
+    if (!element) return false;
+    
+    // Don't apply to buttons, links, inputs, etc.
+    const tagName = element.tagName.toLowerCase();
+    const interactiveTags = ['a', 'button', 'input', 'textarea', 'select', 'img', 'svg'];
+    if (interactiveTags.includes(tagName)) return false;
+    
+    // Don't apply to navigation menu
+    if (element.closest('.navmenu')) return false;
+    if (element.closest('nav')) return false;
+    
+    // Don't apply to buttons and button-like elements
+    if (element.closest('.btn')) return false;
+    if (element.closest('button')) return false;
+    if (element.classList.contains('btn')) return false;
+    
+    // Don't apply to portfolio items, service cards, etc.
+    const interactiveClasses = [
+      'portfolio-wrap', 'service-card', 'scroll-top', 
+      'portfolio-item', 'card-action', 'portfolio-links',
+      'resume-item', 'skill-item', 'stat-card',
+      'portfolio-info', 'service-icon', 'contact-form'
+    ];
+    
+    for (const className of interactiveClasses) {
+      if (element.classList.contains(className)) return false;
+      if (element.closest('.' + className)) return false;
+    }
+    
+    // Check if element has text content
+    const textContent = element.textContent || element.innerText || '';
+    const hasText = textContent.trim().length > 0;
+    
+    // Check if it's a text node or contains text
+    if (element.nodeType === Node.TEXT_NODE) return true;
+    if (hasText && !element.querySelector('a, button, .btn, input, textarea')) {
+      return true;
+    }
+    
+    return false;
+  }
+
+  // Get font size of text element
+  function getTextFontSize(element) {
+    if (!element) return 16;
+    
+    const computedStyle = window.getComputedStyle(element);
+    const fontSize = parseFloat(computedStyle.fontSize);
+    return fontSize || 16;
+  }
 
   // Update mouse position
   document.addEventListener('mousemove', (e) => {
@@ -44,7 +97,7 @@
     cursor.style.top = mouseY + 'px';
     
     // Update target position for follower
-    if (!isHovering) {
+    if (!isHovering && !isTextMode) {
       targetX = mouseX;
       targetY = mouseY;
     }
@@ -116,9 +169,39 @@
     return null;
   }
 
-  // Handle mouseover - expand cursor to fill element
+  // Handle mouseover
   document.addEventListener('mouseover', (e) => {
-    const hoverableElement = findHoverableElement(e.target);
+    const target = e.target;
+    
+    // Check if it's a text element (not button/nav)
+    if (isTextElement(target)) {
+      isTextMode = true;
+      const fontSize = getTextFontSize(target);
+      
+      // Hide follower cursor
+      cursorFollower.style.opacity = '0';
+      
+      // Show text cursor with matching font size
+      cursor.classList.add('text-cursor');
+      cursor.style.height = fontSize + 'px';
+      cursor.style.width = '2px';
+      cursor.style.borderRadius = '1px';
+      cursor.style.backgroundColor = '#ff922b';
+      
+      return;
+    }
+    
+    // Reset text mode
+    isTextMode = false;
+    cursor.classList.remove('text-cursor');
+    cursor.style.height = '8px';
+    cursor.style.width = '8px';
+    cursor.style.borderRadius = '50%';
+    cursor.style.backgroundColor = defaultColor;
+    cursorFollower.style.opacity = '1';
+    
+    // Check for interactive elements
+    const hoverableElement = findHoverableElement(target);
     
     if (hoverableElement && hoverableElement !== currentHoverElement) {
       currentHoverElement = hoverableElement;
@@ -144,9 +227,26 @@
     }
   });
 
-  // Handle mouseout - shrink cursor back
+  // Handle mouseout
   document.addEventListener('mouseout', (e) => {
-    const hoverableElement = findHoverableElement(e.target);
+    const target = e.target;
+    
+    // Check if leaving text element
+    if (isTextElement(target)) {
+      const relatedTarget = e.relatedTarget;
+      if (!relatedTarget || !isTextElement(relatedTarget)) {
+        isTextMode = false;
+        cursor.classList.remove('text-cursor');
+        cursor.style.height = '8px';
+        cursor.style.width = '8px';
+        cursor.style.borderRadius = '50%';
+        cursor.style.backgroundColor = defaultColor;
+        cursorFollower.style.opacity = '1';
+      }
+    }
+    
+    // Check for interactive elements
+    const hoverableElement = findHoverableElement(target);
     
     if (hoverableElement === currentHoverElement) {
       // Check if we're actually leaving the element
@@ -174,16 +274,20 @@
 
   // Click effect
   document.addEventListener('mousedown', () => {
-    cursor.style.transform = 'translate(-50%, -50%) scale(0.6)';
-    if (!isHovering) {
-      cursorFollower.style.transform = 'translate(-50%, -50%) scale(0.8)';
+    if (!isTextMode) {
+      cursor.style.transform = 'translate(-50%, -50%) scale(0.6)';
+      if (!isHovering) {
+        cursorFollower.style.transform = 'translate(-50%, -50%) scale(0.8)';
+      }
     }
   });
 
   document.addEventListener('mouseup', () => {
-    cursor.style.transform = 'translate(-50%, -50%) scale(1)';
-    if (!isHovering) {
-      cursorFollower.style.transform = 'translate(-50%, -50%) scale(1)';
+    if (!isTextMode) {
+      cursor.style.transform = 'translate(-50%, -50%) scale(1)';
+      if (!isHovering) {
+        cursorFollower.style.transform = 'translate(-50%, -50%) scale(1)';
+      }
     }
   });
 
@@ -195,7 +299,9 @@
 
   document.addEventListener('mouseenter', () => {
     cursor.style.opacity = '1';
-    cursorFollower.style.opacity = '1';
+    if (!isTextMode) {
+      cursorFollower.style.opacity = '1';
+    }
   });
 
   // Handle window resize
@@ -223,6 +329,16 @@
         cursorFollower.classList.remove('hover');
         cursorFollower.removeAttribute('data-filling');
         cursorFollower.style.borderColor = defaultColor;
+      }
+      
+      if (isTextMode) {
+        isTextMode = false;
+        cursor.classList.remove('text-cursor');
+        cursor.style.height = '8px';
+        cursor.style.width = '8px';
+        cursor.style.borderRadius = '50%';
+        cursor.style.backgroundColor = defaultColor;
+        cursorFollower.style.opacity = '1';
       }
     }, 250);
   });

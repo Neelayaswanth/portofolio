@@ -1,6 +1,6 @@
 /**
  * Page Preloader Animation
- * Clean and elegant animation similar to modern portfolio sites
+ * Ball falls and bounces to 4 positions, revealing YASH letters
  */
 
 (function() {
@@ -10,36 +10,12 @@
   const preloaderHTML = `
     <div id="page-preloader" class="page-preloader">
       <div class="preloader-content">
-        <div class="bike-wrapper">
-          <svg class="bike" width="100" height="60" viewBox="0 0 100 60" xmlns="http://www.w3.org/2000/svg">
-            <!-- Back Wheel -->
-            <g class="wheel wheel-back">
-              <circle cx="20" cy="45" r="10" fill="none" stroke="#ff922b" stroke-width="2"/>
-              <circle cx="20" cy="45" r="3" fill="#ff922b"/>
-              <line x1="20" y1="35" x2="20" y2="55" stroke="#ff922b" stroke-width="1" opacity="0.6"/>
-              <line x1="10" y1="45" x2="30" y2="45" stroke="#ff922b" stroke-width="1" opacity="0.6"/>
-            </g>
-            <!-- Front Wheel -->
-            <g class="wheel wheel-front">
-              <circle cx="75" cy="45" r="10" fill="none" stroke="#ff922b" stroke-width="2"/>
-              <circle cx="75" cy="45" r="3" fill="#ff922b"/>
-              <line x1="75" y1="35" x2="75" y2="55" stroke="#ff922b" stroke-width="1" opacity="0.6"/>
-              <line x1="65" y1="45" x2="85" y2="45" stroke="#ff922b" stroke-width="1" opacity="0.6"/>
-            </g>
-            <!-- Frame -->
-            <path d="M 20 45 L 30 25 L 50 20 L 70 25 L 75 45" stroke="#ff922b" stroke-width="2.5" fill="none" stroke-linecap="round"/>
-            <!-- Seat -->
-            <ellipse cx="30" cy="23" rx="4" ry="2" fill="#ff922b"/>
-            <!-- Handlebars -->
-            <line x1="70" y1="25" x2="75" y2="18" stroke="#ff922b" stroke-width="2.5" stroke-linecap="round"/>
-            <line x1="73" y1="18" x2="77" y2="18" stroke="#ff922b" stroke-width="3" stroke-linecap="round"/>
-          </svg>
-        </div>
+        <div class="ball" id="ball"></div>
         <div class="name-text" id="nameText">
-          <span class="letter">Y</span>
-          <span class="letter">a</span>
-          <span class="letter">s</span>
-          <span class="letter">h</span>
+          <span class="letter" data-position="1">Y</span>
+          <span class="letter" data-position="2">a</span>
+          <span class="letter" data-position="3">s</span>
+          <span class="letter" data-position="4">h</span>
         </div>
       </div>
     </div>
@@ -49,57 +25,117 @@
   document.body.insertAdjacentHTML('afterbegin', preloaderHTML);
 
   const preloader = document.getElementById('page-preloader');
-  const bike = preloader.querySelector('.bike');
+  const ball = document.getElementById('ball');
   const nameText = document.getElementById('nameText');
   const letters = nameText.querySelectorAll('.letter');
-  const backWheel = preloader.querySelector('.wheel-back');
-  const frontWheel = preloader.querySelector('.wheel-front');
   const mainContent = document.body;
 
   // Hide main content initially
   mainContent.style.overflow = 'hidden';
 
+  // Get viewport dimensions
+  const getViewportCenter = () => ({
+    x: window.innerWidth / 2,
+    y: window.innerHeight / 2
+  });
+
+  // Calculate 4 positions around the center
+  const getPositions = () => {
+    const center = getViewportCenter();
+    const radius = Math.min(window.innerWidth, window.innerHeight) * 0.25;
+    
+    return [
+      { x: center.x - radius, y: center.y - radius }, // Top-left
+      { x: center.x + radius, y: center.y - radius }, // Top-right
+      { x: center.x - radius, y: center.y + radius }, // Bottom-left
+      { x: center.x + radius, y: center.y + radius }  // Bottom-right
+    ];
+  };
+
   // Animation timeline
   function startAnimation() {
-    // Phase 1: Bike moves left to right (2s)
-    bike.style.animation = 'bikeMove 2s ease-in-out forwards';
-    backWheel.style.animation = 'wheelRotate 0.4s linear infinite';
-    frontWheel.style.animation = 'wheelRotate 0.4s linear infinite';
+    const positions = getPositions();
+    const center = getViewportCenter();
+    
+    // Phase 1: Ball falls from top to center (0.8s)
+    ball.style.left = center.x + 'px';
+    ball.style.top = '-50px';
+    ball.style.opacity = '1';
+    ball.style.transform = 'translate(-50%, -50%) scale(1)';
     
     setTimeout(() => {
-      // Stop wheels and fade bike
-      backWheel.style.animation = 'none';
-      frontWheel.style.animation = 'none';
-      bike.style.opacity = '0';
-      bike.style.transition = 'opacity 0.5s ease-out';
+      ball.style.top = center.y + 'px';
+      ball.style.transition = 'top 0.8s cubic-bezier(0.68, -0.55, 0.265, 1.55)';
       
-      // Phase 2: Name appears letter by letter (1.5s)
+      // Bounce effect when landing
       setTimeout(() => {
-        nameText.style.opacity = '1';
-        letters.forEach((letter, index) => {
-          setTimeout(() => {
-            letter.style.opacity = '1';
-            letter.style.transform = 'translateY(0)';
-          }, index * 200);
-        });
-      }, 500);
-      
-      // Phase 3: Fade out and reveal portfolio (1s)
-      setTimeout(() => {
-        preloader.style.opacity = '0';
-        preloader.style.transition = 'opacity 1s ease-out';
-        
+        ball.style.transform = 'translate(-50%, -50%) scale(1.2)';
         setTimeout(() => {
-          preloader.style.display = 'none';
-          mainContent.style.overflow = '';
+          ball.style.transform = 'translate(-50%, -50%) scale(1)';
+        }, 150);
+      }, 800);
+    }, 100);
+    
+    // Phase 2: Ball jumps to 4 positions, revealing letters
+    setTimeout(() => {
+      positions.forEach((pos, index) => {
+        setTimeout(() => {
+          // Move ball to position
+          ball.style.left = pos.x + 'px';
+          ball.style.top = pos.y + 'px';
+          ball.style.transition = 'all 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55)';
           
-          // Trigger AOS animations
-          if (typeof AOS !== 'undefined') {
-            AOS.init();
-          }
-        }, 1000);
-      }, 2000);
-    }, 2000);
+          // Bounce effect
+          setTimeout(() => {
+            ball.style.transform = 'translate(-50%, -50%) scale(1.3)';
+            setTimeout(() => {
+              ball.style.transform = 'translate(-50%, -50%) scale(1)';
+            }, 200);
+          }, 100);
+          
+          // Reveal letter after ball reaches position
+          setTimeout(() => {
+            const letter = letters[index];
+            letter.style.opacity = '1';
+            letter.style.transform = 'scale(1)';
+            letter.style.left = pos.x + 'px';
+            letter.style.top = pos.y + 'px';
+          }, 400);
+        }, index * 600);
+      });
+      
+      // Phase 3: Fade out and reveal portfolio
+      setTimeout(() => {
+        // Fade out ball
+        ball.style.opacity = '0';
+        ball.style.transition = 'opacity 0.5s ease-out';
+        
+        // Fade out letters
+        setTimeout(() => {
+          letters.forEach((letter, index) => {
+            setTimeout(() => {
+              letter.style.opacity = '0';
+            }, index * 100);
+          });
+        }, 200);
+        
+        // Fade out preloader
+        setTimeout(() => {
+          preloader.style.opacity = '0';
+          preloader.style.transition = 'opacity 1s ease-out';
+          
+          setTimeout(() => {
+            preloader.style.display = 'none';
+            mainContent.style.overflow = '';
+            
+            // Trigger AOS animations
+            if (typeof AOS !== 'undefined') {
+              AOS.init();
+            }
+          }, 1000);
+        }, 800);
+      }, 2400 + 600); // Wait for all 4 jumps + delay
+    }, 1200); // Wait for initial fall + bounce
   }
 
   // Start animation

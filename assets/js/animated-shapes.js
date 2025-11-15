@@ -415,7 +415,7 @@
 
   // Create name animation
   function createNameAnimation(container) {
-    const nameChars = ['Y', 'A', 'S', 'H', 'A'];
+    const nameChars = ['Y', 'A', 'S', 'H', 'N'];
     const nameColors = ['#22d3ee', '#d946ef', '#fde047', '#a3e636', '#ff6b35']; // cyan, fuchsia, yellow, lime, orange
     
     const nameWrapper = document.createElement('h1');
@@ -450,10 +450,10 @@
         // S: yellow to lime (blending A and H) - vibrant mix
         gradient = `linear-gradient(135deg, ${nameColors[2]} 0%, ${nameColors[3]} 50%, ${nameColors[1]} 100%)`;
       } else if (index === 3) {
-        // H: lime to orange (blending S and A) - vibrant transition
+        // H: lime to orange (blending S and N) - vibrant transition
         gradient = `linear-gradient(135deg, ${nameColors[3]} 0%, ${nameColors[4]} 50%, ${nameColors[2]} 100%)`;
       } else {
-        // A (5th): orange to cyan (blending H and Y, circular) - full spectrum
+        // N (5th): orange to cyan (blending H and Y, circular) - full spectrum
         gradient = `linear-gradient(135deg, ${nameColors[4]} 0%, ${nameColors[0]} 50%, ${nameColors[3]} 100%)`;
       }
       
@@ -515,11 +515,11 @@
       }
     }, 1000);
 
-    // Stage 3: Show remaining letters (A, S, H, A) (2000ms)
+    // Stage 3: Show remaining letters (A, S, H, N) (2000ms)
     setTimeout(() => {
       animationStage = stages.SHOW_ASH;
       
-      // Show remaining characters (A, S, H, A)
+      // Show remaining characters (A, S, H, N)
       const nameChars = document.querySelectorAll('.name-char');
       nameChars.forEach((char, index) => {
         if (index > 0 && char.classList.contains('hidden')) {

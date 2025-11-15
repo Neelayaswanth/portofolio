@@ -2548,3 +2548,106 @@ section,
 .starter-section {
   /* Add your styles here */
 }
+
+/*--------------------------------------------------------------
+# Custom Cursor (Inspired by azumbrunnen.me)
+--------------------------------------------------------------*/
+.custom-cursor,
+.custom-cursor-follower {
+  position: fixed;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 9999;
+  mix-blend-mode: difference;
+  transition: transform 0.1s ease-out;
+}
+
+.custom-cursor {
+  width: 5px;
+  height: 5px;
+  background-color: #ececec;
+  transform: translate(-50%, -50%);
+  will-change: transform;
+  transition: background-color 0.3s ease, 
+              transform 0.2s ease,
+              width 0.2s ease,
+              height 0.2s ease,
+              border-radius 0.2s ease;
+  border-radius: 50%;
+  box-shadow: 0 0 6px rgba(236, 236, 236, 0.8);
+  z-index: 999999;
+}
+
+.custom-cursor.text-cursor {
+  width: 2px;
+  min-height: 16px;
+  background-color: #ff922b;
+  border-radius: 1px;
+  animation: textCursorBlink 1s infinite;
+  transition: height 0.2s ease;
+}
+
+@keyframes textCursorBlink {
+  0%, 50% {
+    opacity: 1;
+  }
+  51%, 100% {
+    opacity: 0.3;
+  }
+}
+
+.custom-cursor-follower {
+  width: 30px;
+  height: 30px;
+  border: 1px solid #ececec;
+  background-color: transparent;
+  transform: translate(-50%, -50%);
+  transition: border-radius 0.3s ease-out, 
+              border-color 0.3s ease, 
+              background-color 0.3s ease;
+  will-change: transform, width, height, border-radius;
+  border-radius: 50%;
+}
+
+.custom-cursor-follower[data-filling="true"] {
+  border-width: 1px;
+  background-color: transparent !important;
+}
+
+/* Hide default cursor on desktop */
+@media (min-width: 992px) {
+  body {
+    cursor: none;
+  }
+  
+  * {
+    cursor: none !important;
+  }
+}
+
+/* Cursor hover effects */
+.custom-cursor.hover {
+  opacity: 1;
+}
+
+.custom-cursor-follower.hover {
+  border-width: 1px;
+}
+
+/* Cursor filling effect is handled by JavaScript */
+
+/* Hide cursor on mobile devices */
+@media (max-width: 991px) {
+  .custom-cursor,
+  .custom-cursor-follower {
+    display: none;
+  }
+  
+  body {
+    cursor: auto;
+  }
+  
+  * {
+    cursor: auto !important;
+  }
+}

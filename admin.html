@@ -139,11 +139,18 @@
   <!-- Dashboard Container -->
   <div id="dashboard-container">
   <div class="container">
-    <h1 class="mb-4">Portfolio Analytics Dashboard</h1>
-      
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <h1 class="mb-0">Portfolio Analytics Dashboard</h1>
       <button class="btn btn-secondary logout-btn" onclick="logout()">
         <i class="bi bi-box-arrow-right"></i> Logout
       </button>
+    </div>
+    
+    <div class="mb-4">
+      <a href="visitors.html" class="btn btn-outline-light me-2"><i class="bi bi-people"></i> Unique Visitors</a>
+      <a href="activities.html" class="btn btn-outline-light me-2"><i class="bi bi-eye"></i> Recent Activities</a>
+      <a href="messages.html" class="btn btn-outline-light"><i class="bi bi-envelope"></i> Messages</a>
+    </div>
     
     <div class="alert alert-info" id="connection-status" style="display: none;">
       <i class="bi bi-info-circle"></i> <span id="status-message"></span>

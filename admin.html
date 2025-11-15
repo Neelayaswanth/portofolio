@@ -104,14 +104,28 @@
     // Auto-detect API URL based on current origin
     const getApiBaseUrl = () => {
       const currentOrigin = window.location.origin;
-      // If running on 127.0.0.1, use 127.0.0.1 for API too
+      
+      // Production - custom domain
+      if (currentOrigin.includes('yaswanthneela.me') || currentOrigin.includes('www.yaswanthneela.me')) {
+        // Update this to your deployed backend URL (e.g., Render, Railway, etc.)
+        return 'https://your-backend-app.onrender.com/api'; // TODO: Update with your backend URL
+      }
+      
+      // Development - localhost
       if (currentOrigin.includes('127.0.0.1')) {
         return 'http://127.0.0.1:3000/api';
       }
-      // Otherwise use localhost
-        return 'https://portofolio-c57b.onrender.com/api';    };
+      
+      if (currentOrigin.includes('localhost')) {
+        return 'http://localhost:3000/api';
+      }
+      
+      // Default: use Render backend (update this to your actual backend URL)
+      return 'https://your-backend-app.onrender.com/api'; // TODO: Update with your backend URL
+    };
     
     const API_BASE_URL = getApiBaseUrl();
+    console.log('Admin Dashboard - API Base URL:', API_BASE_URL);
 
     // Check server connection
     async function checkServerConnection() {

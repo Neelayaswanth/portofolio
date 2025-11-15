@@ -7,20 +7,23 @@
 const getApiBaseUrl = () => {
   const currentOrigin = window.location.origin;
   
-  // Production - use the same origin for API (assuming API is on same domain)
-  if (currentOrigin.includes('yaswanthneela.me') || currentOrigin.includes('github.io') || currentOrigin.includes('netlify.app') || currentOrigin.includes('vercel.app')) {
-    // For production, the API should be on the same domain or a subdomain
-    // Update this to match your production API URL
-    return 'https://your-api-domain.com/api'; // TODO: Update with your production API URL
+  // Production - custom domain (yaswanthneela.me)
+  if (currentOrigin.includes('yaswanthneela.me') || currentOrigin.includes('www.yaswanthneela.me')) {
+    // Update this to your deployed backend URL (e.g., Render, Railway, Heroku, etc.)
+    return 'https://your-backend-app.onrender.com/api'; // TODO: Update with your actual backend URL
   }
   
-  // Development - use localhost
+  // Development - localhost
   if (currentOrigin.includes('127.0.0.1')) {
     return 'http://127.0.0.1:3000/api';
   }
   
-  // Default to localhost
-  return 'http://localhost:3000/api';
+  if (currentOrigin.includes('localhost')) {
+    return 'http://localhost:3000/api';
+  }
+  
+  // Default: use deployed backend (update this to your actual backend URL)
+  return 'https://your-backend-app.onrender.com/api'; // TODO: Update with your actual backend URL
 };
 
 const API_BASE_URL = getApiBaseUrl();

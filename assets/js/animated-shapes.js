@@ -43,8 +43,8 @@
     // Create grid background
     createGridBackground(animationContainer);
 
-    // Create animated shapes
-    createAnimatedShapes(animationContainer);
+    // Create animated shapes - DISABLED (blocks removed)
+    // createAnimatedShapes(animationContainer);
 
     // Create cursor trail
     createCursorTrail();
@@ -120,29 +120,6 @@
     
     const style = document.createElement('style');
     style.textContent = `
-      @keyframes block-slide-right-to-left {
-        0% { 
-          transform: translateX(120vw) translateY(0) rotate(0deg); 
-          opacity: 0; 
-        }
-        10% { 
-          opacity: 1; 
-        }
-        90% { 
-          opacity: 1; 
-        }
-        100% { 
-          transform: translateX(-20vw) translateY(0) rotate(0deg); 
-          opacity: 0; 
-        }
-      }
-      
-      .animated-block {
-        animation: block-slide-right-to-left 2s ease-in-out forwards;
-        border-radius: 8px;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-      }
-      
       .grid-background {
         position: absolute;
         inset: 0;
@@ -512,19 +489,11 @@
 
   // Start animation sequence
   function startAnimationSequence(overlay) {
-    // Stage 1: Show Grid & Blocks (500ms)
+    // Stage 1: Show Grid (500ms)
     setTimeout(() => {
       animationStage = stages.SHOW_GRID_SHAPES;
       const grid = document.getElementById('grid-background');
       if (grid) grid.classList.add('visible');
-      
-      // Show all blocks - they will animate from right to left
-      for (let i = 1; i <= 24; i++) {
-        const block = document.getElementById(`block-${i}`);
-        if (block) {
-          block.style.opacity = '1';
-        }
-      }
     }, 500);
 
     // Stage 2: Show 'Y' (1000ms)
@@ -546,17 +515,9 @@
       }
     }, 1000);
 
-    // Stage 3: Hide blocks, show remaining letters (A, S, H, A) (2000ms)
+    // Stage 3: Show remaining letters (A, S, H, A) (2000ms)
     setTimeout(() => {
       animationStage = stages.SHOW_ASH;
-      // Hide all blocks
-      for (let i = 1; i <= 24; i++) {
-        const block = document.getElementById(`block-${i}`);
-        if (block) {
-          block.style.opacity = '0';
-          block.style.pointerEvents = 'none';
-        }
-      }
       
       // Show remaining characters (A, S, H, A)
       const nameChars = document.querySelectorAll('.name-char');

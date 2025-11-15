@@ -201,6 +201,25 @@
   // Start animation
   animateCursor();
 
+  // Ensure cursor is visible on page load
+  window.addEventListener('load', () => {
+    cursor.style.opacity = '1';
+    cursorFollower.style.opacity = '1';
+    cursor.style.display = 'block';
+    cursorFollower.style.display = 'block';
+  });
+
+  // Ensure cursor is visible when DOM is ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+      cursor.style.opacity = '1';
+      cursorFollower.style.opacity = '1';
+    });
+  } else {
+    cursor.style.opacity = '1';
+    cursorFollower.style.opacity = '1';
+  }
+
   // Find the hoverable element (closest interactive element)
   function findHoverableElement(element) {
     if (!element) return null;
@@ -371,6 +390,42 @@
     cursor.style.opacity = '1';
     if (!isTextMode) {
       cursorFollower.style.opacity = '1';
+    }
+  });
+
+  // Handle window focus/blur to restore cursor visibility
+  window.addEventListener('blur', () => {
+    // When window loses focus (e.g., opening new tab), hide cursor
+    cursor.style.opacity = '0';
+    cursorFollower.style.opacity = '0';
+  });
+
+  window.addEventListener('focus', () => {
+    // When window regains focus, show cursor again
+    cursor.style.opacity = '1';
+    if (!isTextMode) {
+      cursorFollower.style.opacity = '1';
+    }
+    // Force cursor position update
+    cursor.style.left = mouseX + 'px';
+    cursor.style.top = mouseY + 'px';
+  });
+
+  // Handle visibility change (when tab becomes visible/hidden)
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      // Tab is hidden, hide cursor
+      cursor.style.opacity = '0';
+      cursorFollower.style.opacity = '0';
+    } else {
+      // Tab is visible, show cursor
+      cursor.style.opacity = '1';
+      if (!isTextMode) {
+        cursorFollower.style.opacity = '1';
+      }
+      // Force cursor position update
+      cursor.style.left = mouseX + 'px';
+      cursor.style.top = mouseY + 'px';
     }
   });
 

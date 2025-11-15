@@ -2623,6 +2623,16 @@ section,
   * {
     cursor: none !important;
   }
+  
+  /* Ensure cursor is visible for external links */
+  a[target="_blank"] {
+    cursor: none !important;
+  }
+  
+  /* Restore cursor visibility when custom cursor is not available */
+  body:not(:has(.custom-cursor)) {
+    cursor: auto;
+  }
 }
 
 /* Cursor hover effects */

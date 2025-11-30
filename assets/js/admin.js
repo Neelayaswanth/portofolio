@@ -1717,37 +1717,31 @@ async function loadOnlineUsers() {
     // Get last 5 minutes timestamp for truly active users
     const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
     
-    // Query visitors table for recent activity (most accurate)
-    const { data: recentVisitors, error: visitorsError } = await supabase
-      .from('visitors')
-      .select('ip_address, last_visit, user_agent, visit_count')
-      .gte('last_visit', fiveMinutesAgo)
-      .order('last_visit', { ascending: false });
-
-    if (visitorsError) {
-      console.warn('Error loading visitors:', visitorsError);
-    }
-
-    // Also get the most recent profile view for each visitor to get current page info
+    // Query ALL recent profile views (this shows all active sessions/viewers)
     const { data: recentViews, error: viewsError } = await supabase
       .from('profile_views')
-      .select('ip_address, viewed_at, referrer, user_agent')
+      .select('ip_address, viewed_at, referrer, user_agent, session_id')
       .gte('viewed_at', fiveMinutesAgo)
-      .order('viewed_at', { ascending: false });
+      .order('viewed_at', { ascending: false })
+      .limit(500); // Get up to 500 recent views
 
     if (viewsError) {
-      console.warn('Error loading profile views:', viewsError);
+      console.error('❌ Error loading profile views:', viewsError);
+      tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger">Error loading online users: ' + (viewsError.message || 'Unknown error') + '</td></tr>';
+      return;
+    }
+
+    if (!recentViews || recentViews.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" class="text-center text-info">📭 No users online right now</td></tr>';
+      window.allOnlineUsers = [];
+      return;
     }
 
     // Get visitor names from visitor_responses
-    const { data: visitorResponses, error: responsesError } = await supabase
+    const { data: visitorResponses } = await supabase
       .from('visitor_responses')
       .select('visitor_id, ip_address, visitor_name')
       .not('visitor_name', 'is', null);
-
-    if (responsesError) {
-      console.warn('Error loading visitor responses:', responsesError);
-    }
 
     // Create a map of visitor names by IP/visitor_id
     const nameMap = new Map();
@@ -1756,15 +1750,45 @@ async function loadOnlineUsers() {
       if (key && response.visitor_name) {
         nameMap.set(key, response.visitor_name);
       }
+      // Also map by IP for lookup
+      if (response.ip_address) {
+        nameMap.set(response.ip_address, response.visitor_name);
+      }
     });
 
-    // Create a map of recent views by IP for current page info
-    const viewsMap = new Map();
-    recentViews?.forEach(view => {
+    // Group by IP address - show all unique users viewing the site
+    // One entry per IP (each IP = one user/viewer)
+    const uniqueUsers = new Map();
+    
+    recentViews.forEach(view => {
       const ip = view.ip_address;
       if (!ip || ip === 'unknown') return;
       
-      if (!viewsMap.has(ip)) {
+      // If this IP already exists, update it only if this view is more recent
+      if (uniqueUsers.has(ip)) {
+        const existing = uniqueUsers.get(ip);
+        const existingTime = new Date(existing.last_activity);
+        const currentTime = new Date(view.viewed_at);
+        
+        if (currentTime > existingTime) {
+          existing.last_activity = view.viewed_at;
+          
+          // Update current page from referrer
+          try {
+            if (view.referrer && view.referrer !== 'direct' && view.referrer !== 'Direct') {
+              const url = new URL(view.referrer);
+              existing.current_page = url.pathname || existing.current_page;
+            }
+          } catch (e) {
+            // Keep existing page
+          }
+          // Update user agent if more recent
+          if (view.user_agent) {
+            existing.user_agent = view.user_agent;
+          }
+        }
+      } else {
+        // New viewer - add to list
         let currentPage = '/';
         try {
           if (view.referrer && view.referrer !== 'direct' && view.referrer !== 'Direct') {
@@ -1775,34 +1799,24 @@ async function loadOnlineUsers() {
           currentPage = '/';
         }
         
-        viewsMap.set(ip, {
+        const visitorName = nameMap.get(ip) || nameMap.get(view.session_id);
+        
+        uniqueUsers.set(ip, {
+          ip_address: ip,
+          visitor_id: ip,
+          session_id: view.session_id || 'No Session',
+          name: visitorName || null,
+          last_activity: view.viewed_at,
           current_page: currentPage,
           user_agent: view.user_agent || 'Unknown',
-          viewed_at: view.viewed_at
+          is_active: true
         });
       }
     });
 
-    // Build online users array from visitors table
-    const onlineUsersArray = [];
-    recentVisitors?.forEach(visitor => {
-      const ip = visitor.ip_address;
-      if (!ip || ip === 'unknown') return;
-      
-      const viewInfo = viewsMap.get(ip);
-      const visitorName = nameMap.get(ip) || nameMap.get(visitor.ip_address);
-      
-      onlineUsersArray.push({
-        ip_address: ip,
-        visitor_id: ip,
-        name: visitorName || null,
-        last_activity: visitor.last_visit,
-        current_page: viewInfo?.current_page || '/',
-        user_agent: viewInfo?.user_agent || visitor.user_agent || 'Unknown',
-        visit_count: visitor.visit_count || 1,
-        is_active: true
-      });
-    });
+    // Convert to array - this shows ALL unique active viewers (one per IP)
+    const onlineUsersArray = Array.from(uniqueUsers.values())
+      .sort((a, b) => new Date(b.last_activity) - new Date(a.last_activity));
 
     // Set names for users without names and ensure all fields are set
     onlineUsersArray.forEach(user => {

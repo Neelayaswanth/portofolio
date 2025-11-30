@@ -1838,9 +1838,23 @@ async function loadOnlineUsers() {
         // Use session_id as visitor_id if available (for uniqueness), otherwise use IP
         const visitorId = sessionId || normalizedIP;
         
+        // Get the visitor_id from visitor_responses if it exists (might be different format)
+        let displayVisitorId = visitorId;
+        if (sessionId) {
+          // Try to find the actual visitor_id stored in visitor_responses for this session
+          const matchingResponse = visitorResponses?.find(r => 
+            r.session_id === sessionId || 
+            (r.visitor_id && r.visitor_id.includes(sessionId)) ||
+            (r.ip_address === normalizedIP && r.session_id === sessionId)
+          );
+          if (matchingResponse && matchingResponse.visitor_id) {
+            displayVisitorId = matchingResponse.visitor_id;
+          }
+        }
+        
         uniqueUsers.set(uniqueKey, {
           ip_address: normalizedIP,
-          visitor_id: visitorId, // Use session_id as visitor_id for uniqueness
+          visitor_id: displayVisitorId, // Use actual visitor_id from responses if available
           session_id: sessionId || 'No Session',
           name: visitorName || null,
           last_activity: view.viewed_at,

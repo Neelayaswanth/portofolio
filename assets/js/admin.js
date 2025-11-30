@@ -1822,33 +1822,40 @@ async function loadOnlineUsers() {
           currentPage = '/';
         }
         
-        // Get visitor name - prioritize session_id match (most accurate)
-        // Try session_id first, then visitor_id match, then IP as last resort
+        // Get visitor name and visitor_id from visitor_responses - match by session_id (most accurate)
         let visitorName = null;
-        if (sessionId) {
-          visitorName = nameMapBySessionId.get(sessionId) || null;
-        }
-        if (!visitorName && sessionId) {
-          visitorName = nameMapByVisitorId.get(sessionId) || null;
-        }
-        if (!visitorName) {
-          visitorName = nameMapByVisitorId.get(normalizedIP) || nameMapByIP.get(normalizedIP) || null;
-        }
+        let displayVisitorId = sessionId || normalizedIP;
         
-        // Use session_id as visitor_id if available (for uniqueness), otherwise use IP
-        const visitorId = sessionId || normalizedIP;
-        
-        // Get the visitor_id from visitor_responses if it exists (might be different format)
-        let displayVisitorId = visitorId;
         if (sessionId) {
-          // Try to find the actual visitor_id stored in visitor_responses for this session
+          // Find the matching visitor_response for this session
           const matchingResponse = visitorResponses?.find(r => 
-            r.session_id === sessionId || 
-            (r.visitor_id && r.visitor_id.includes(sessionId)) ||
-            (r.ip_address === normalizedIP && r.session_id === sessionId)
+            r.session_id === sessionId
           );
-          if (matchingResponse && matchingResponse.visitor_id) {
-            displayVisitorId = matchingResponse.visitor_id;
+          
+          if (matchingResponse) {
+            visitorName = matchingResponse.visitor_name || null;
+            displayVisitorId = matchingResponse.visitor_id || sessionId || normalizedIP;
+          } else {
+            // Fallback: try to match by session_id in name maps
+            visitorName = nameMapBySessionId.get(sessionId) || null;
+          }
+        }
+        
+        // If still no name, try other fallback methods
+        if (!visitorName) {
+          visitorName = nameMapByVisitorId.get(sessionId) || 
+                       nameMapByVisitorId.get(normalizedIP) || 
+                       nameMapByIP.get(normalizedIP) || 
+                       null;
+        }
+        
+        // If still no visitor_id, use session_id or IP
+        if (displayVisitorId === (sessionId || normalizedIP) && sessionId) {
+          const matchingResponseByIP = visitorResponses?.find(r => 
+            r.session_id === sessionId || r.ip_address === normalizedIP
+          );
+          if (matchingResponseByIP && matchingResponseByIP.visitor_id) {
+            displayVisitorId = matchingResponseByIP.visitor_id;
           }
         }
         

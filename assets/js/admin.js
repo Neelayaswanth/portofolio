@@ -688,11 +688,28 @@ async function loadUserGivenData() {
     // Calculate stats
     // Unique visitors: Only count those who responded "First Time" (user_response = true)
     const firstTimeResponses = responses.filter(r => r.user_response === true);
-    const uniqueVisitors = new Set(firstTimeResponses.map(r => r.visitor_id || r.session_id)).size;
+    
+    // Create a Set of unique identifiers - check visitor_id, ip_address, and session_id
+    const uniqueVisitorSet = new Set();
+    firstTimeResponses.forEach(r => {
+      // Use visitor_id if available, otherwise fall back to ip_address, then session_id
+      const uniqueId = r.visitor_id || r.ip_address || r.session_id;
+      if (uniqueId && uniqueId !== 'unknown') {
+        uniqueVisitorSet.add(uniqueId);
+      }
+    });
+    const uniqueVisitors = uniqueVisitorSet.size;
+    
     const totalResponses = responses.length;
     const withNames = responses.filter(r => r.visitor_name && r.visitor_name.trim()).length;
 
-    console.log('User given stats:', { uniqueVisitors, totalResponses, withNames, firstTimeCount: firstTimeResponses.length });
+    console.log('User given stats:', { 
+      uniqueVisitors, 
+      totalResponses, 
+      withNames, 
+      firstTimeCount: firstTimeResponses.length,
+      allFirstTimeIds: Array.from(uniqueVisitorSet)
+    });
 
     // Display stats
     const uniqueCountEl = document.getElementById('user-unique-count');
@@ -1669,6 +1686,20 @@ document.addEventListener('DOMContentLoaded', function() {
       loadAnalytics();
     }
   }, 30000);
+  
+  // Auto-refresh online users more frequently (every 15 seconds) to remove offline users
+  setInterval(() => {
+    if (sessionStorage.getItem('adminAuthenticated') === 'true') {
+      // Check if online users tab is active
+      const onlineUsersTab = document.getElementById('online-users-tab');
+      if (onlineUsersTab && onlineUsersTab.classList.contains('active')) {
+        loadOnlineUsers();
+      } else if (window.allOnlineUsers) {
+        // Even if tab is not active, re-render to filter out offline users
+        renderOnlineUsersTable();
+      }
+    }
+  }, 15000); // Refresh every 15 seconds
 });
 
 // Load Online Users (active in last 5 minutes)
@@ -1683,75 +1714,151 @@ async function loadOnlineUsers() {
   }
 
   try {
-    // Get last 5 minutes timestamp
+    // Get last 5 minutes timestamp for truly active users
     const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+    // Get last 30 minutes for recent activity check
+    const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
     
     // Query recent profile views (active users)
-    const { data: recentViews, error } = await supabase
+    const { data: recentViews, error: viewsError } = await supabase
       .from('profile_views')
-      .select('ip_address, viewed_at, referrer, user_agent')
-      .gte('viewed_at', fiveMinutesAgo)
-      .order('viewed_at', { ascending: false });
+      .select('ip_address, viewed_at, referrer, user_agent, session_id')
+      .gte('viewed_at', thirtyMinutesAgo)
+      .order('viewed_at', { ascending: false })
+      .limit(100); // Limit to prevent huge queries
 
-    if (error) {
-      throw error;
+    if (viewsError) {
+      console.warn('Error loading profile views:', viewsError);
     }
 
-    // Group by IP to get unique active users
+    // Also check recent visitor responses for activity
+    const { data: recentResponses, error: responsesError } = await supabase
+      .from('visitor_responses')
+      .select('visitor_id, ip_address, visitor_name, response_time, user_response')
+      .gte('response_time', thirtyMinutesAgo)
+      .order('response_time', { ascending: false })
+      .limit(100);
+
+    if (responsesError) {
+      console.warn('Error loading visitor responses:', responsesError);
+    }
+
+    // Group by IP/visitor_id to get unique active users
     const uniqueUsers = new Map();
+    
+    // Process profile views
     recentViews?.forEach(view => {
       const ip = view.ip_address || 'unknown';
+      if (ip === 'unknown') return;
+      
+      const activityTime = new Date(view.viewed_at);
+      const isActive = activityTime >= new Date(fiveMinutesAgo);
+      
       if (!uniqueUsers.has(ip)) {
+        let currentPage = '/';
+        try {
+          if (view.referrer && view.referrer !== 'direct' && view.referrer !== 'Direct') {
+            const url = new URL(view.referrer);
+            currentPage = url.pathname || '/';
+          }
+        } catch (e) {
+          // If URL parsing fails, just use '/'
+          currentPage = '/';
+        }
+        
         uniqueUsers.set(ip, {
           ip_address: ip,
+          visitor_id: ip,
           last_activity: view.viewed_at,
-          referrer: view.referrer || 'Direct',
-          user_agent: view.user_agent || 'Unknown'
+          current_page: currentPage,
+          user_agent: view.user_agent || 'Unknown',
+          is_active: isActive,
+          session_id: view.session_id
         });
       } else {
         // Update if this is more recent
         const existing = uniqueUsers.get(ip);
-        if (new Date(view.viewed_at) > new Date(existing.last_activity)) {
+        const existingTime = new Date(existing.last_activity);
+        if (activityTime > existingTime) {
           existing.last_activity = view.viewed_at;
-          existing.referrer = view.referrer || existing.referrer;
+          try {
+            if (view.referrer && view.referrer !== 'direct' && view.referrer !== 'Direct') {
+              const url = new URL(view.referrer);
+              existing.current_page = url.pathname || existing.current_page;
+            }
+          } catch (e) {
+            // Keep existing page if URL parsing fails
+          }
+          existing.is_active = isActive;
         }
       }
     });
 
-    // Get visitor names from visitor_responses if available
-    const onlineUsersArray = Array.from(uniqueUsers.values());
-    if (onlineUsersArray.length > 0) {
-      const ips = onlineUsersArray.map(u => u.ip_address);
-      const { data: responses } = await supabase
-        .from('visitor_responses')
-        .select('visitor_id, visitor_name')
-        .in('visitor_id', ips)
-        .not('visitor_name', 'is', null);
-
-      // Map names to users
-      if (responses) {
-        const nameMap = new Map();
-        responses.forEach(r => {
-          if (r.visitor_name && !nameMap.has(r.visitor_id)) {
-            nameMap.set(r.visitor_id, r.visitor_name);
-          }
-        });
-
-        onlineUsersArray.forEach(user => {
-          user.name = nameMap.get(user.ip_address) || 'Anonymous';
+    // Process visitor responses to add names and check activity
+    recentResponses?.forEach(response => {
+      const visitorId = response.visitor_id || response.ip_address;
+      if (!visitorId || visitorId === 'unknown') return;
+      
+      const activityTime = new Date(response.response_time);
+      const isActive = activityTime >= new Date(fiveMinutesAgo);
+      
+      // Try to match by visitor_id or ip_address
+      let matchedUser = null;
+      for (const [key, user] of uniqueUsers.entries()) {
+        if (key === visitorId || key === response.ip_address || user.visitor_id === visitorId) {
+          matchedUser = user;
+          break;
+        }
+      }
+      
+      if (matchedUser) {
+        // Update name if available
+        if (response.visitor_name && !matchedUser.name) {
+          matchedUser.name = response.visitor_name;
+        }
+        // Update activity if more recent
+        const matchedTime = new Date(matchedUser.last_activity);
+        if (activityTime > matchedTime) {
+          matchedUser.last_activity = response.response_time;
+          matchedUser.is_active = isActive;
+        }
+      } else {
+        // New user from response
+        uniqueUsers.set(visitorId, {
+          ip_address: response.ip_address || visitorId,
+          visitor_id: visitorId,
+          last_activity: response.response_time,
+          current_page: '/',
+          user_agent: 'Unknown',
+          is_active: isActive,
+          name: response.visitor_name || null
         });
       }
-    }
+    });
+
+    // Filter to only show truly active users (last 5 minutes)
+    const onlineUsersArray = Array.from(uniqueUsers.values())
+      .filter(user => user.is_active)
+      .sort((a, b) => new Date(b.last_activity) - new Date(a.last_activity));
+
+    // Set names for users without names
+    onlineUsersArray.forEach(user => {
+      if (!user.name) {
+        user.name = 'Anonymous';
+      }
+    })
 
     // Store globally
     window.allOnlineUsers = onlineUsersArray;
+
+    console.log('Online users:', onlineUsersArray.length, onlineUsersArray);
 
     // Render table
     renderOnlineUsersTable();
 
   } catch (err) {
     console.error('Error loading online users:', err);
-    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger">Error loading online users</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger">Error loading online users: ' + (err.message || 'Unknown error') + '</td></tr>';
   }
 }
 
@@ -1760,12 +1867,23 @@ function renderOnlineUsersTable() {
   const tbody = document.getElementById('online-users-table');
   if (!tbody || !window.allOnlineUsers) return;
   
-  if (window.allOnlineUsers.length === 0) {
+  // Filter out users who are no longer online (more than 5 minutes ago)
+  const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+  const currentlyOnlineUsers = window.allOnlineUsers.filter(user => {
+    if (!user.last_activity) return false;
+    const activityTime = new Date(user.last_activity);
+    return activityTime >= fiveMinutesAgo;
+  });
+  
+  // Update global array to only include online users
+  window.allOnlineUsers = currentlyOnlineUsers;
+  
+  if (currentlyOnlineUsers.length === 0) {
     tbody.innerHTML = '<tr><td colspan="6" class="text-center text-info">No users online right now</td></tr>';
     return;
   }
 
-  tbody.innerHTML = window.allOnlineUsers.map((user) => {
+  tbody.innerHTML = currentlyOnlineUsers.map((user) => {
     const escapeHtml = (text) => {
       if (!text) return 'N/A';
       const div = document.createElement('div');
@@ -1777,7 +1895,7 @@ function renderOnlineUsersTable() {
     const timeAgo = user.last_activity ? getTimeAgo(new Date(user.last_activity)) : 'N/A';
     const userAgent = user.user_agent || 'Unknown';
     const shortUserAgent = userAgent.length > 50 ? userAgent.substring(0, 50) + '...' : userAgent;
-    const currentPage = user.referrer && user.referrer !== 'direct' ? new URL(user.referrer).pathname : '/';
+    const currentPage = user.current_page || '/';
     
     return `
       <tr>

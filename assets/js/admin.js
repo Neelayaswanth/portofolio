@@ -1737,22 +1737,37 @@ async function loadOnlineUsers() {
       return;
     }
 
-    // Get visitor names from visitor_responses
+    // Get visitor names from visitor_responses - get ALL responses (not just with names)
     const { data: visitorResponses } = await supabase
       .from('visitor_responses')
-      .select('visitor_id, ip_address, visitor_name')
-      .not('visitor_name', 'is', null);
+      .select('visitor_id, ip_address, visitor_name, session_id')
+      .order('response_time', { ascending: false }); // Get most recent first
 
-    // Create a map of visitor names by IP/visitor_id
-    const nameMap = new Map();
+    // Create multiple maps for name lookup by different identifiers
+    const nameMapBySessionId = new Map();
+    const nameMapByVisitorId = new Map();
+    const nameMapByIP = new Map();
+    
     visitorResponses?.forEach(response => {
-      const key = response.visitor_id || response.ip_address;
-      if (key && response.visitor_name) {
-        nameMap.set(key, response.visitor_name);
+      const name = response.visitor_name;
+      if (!name || !name.trim()) return; // Skip if no name
+      
+      // Map by session_id (most accurate - unique per browser session)
+      if (response.session_id) {
+        nameMapBySessionId.set(response.session_id, name);
       }
-      // Also map by IP for lookup
+      
+      // Map by visitor_id (can be IP or session-based)
+      if (response.visitor_id) {
+        nameMapByVisitorId.set(response.visitor_id, name);
+      }
+      
+      // Map by IP (fallback, but less accurate)
       if (response.ip_address) {
-        nameMap.set(response.ip_address, response.visitor_name);
+        // Only set if not already set (to avoid overwriting with older data)
+        if (!nameMapByIP.has(response.ip_address)) {
+          nameMapByIP.set(response.ip_address, name);
+        }
       }
     });
 
@@ -1807,10 +1822,20 @@ async function loadOnlineUsers() {
           currentPage = '/';
         }
         
-        // Get visitor name - try session_id first, then IP
-        const visitorName = nameMap.get(sessionId) || nameMap.get(normalizedIP) || nameMap.get(ip) || null;
+        // Get visitor name - prioritize session_id match (most accurate)
+        // Try session_id first, then visitor_id match, then IP as last resort
+        let visitorName = null;
+        if (sessionId) {
+          visitorName = nameMapBySessionId.get(sessionId) || null;
+        }
+        if (!visitorName && sessionId) {
+          visitorName = nameMapByVisitorId.get(sessionId) || null;
+        }
+        if (!visitorName) {
+          visitorName = nameMapByVisitorId.get(normalizedIP) || nameMapByIP.get(normalizedIP) || null;
+        }
         
-        // Use session_id as visitor_id if available, otherwise use IP
+        // Use session_id as visitor_id if available (for uniqueness), otherwise use IP
         const visitorId = sessionId || normalizedIP;
         
         uniqueUsers.set(uniqueKey, {

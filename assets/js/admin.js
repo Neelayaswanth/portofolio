@@ -1814,8 +1814,15 @@ async function loadOnlineUsers() {
       }
     });
 
-    // Convert to array - this shows ALL unique active viewers (one per IP)
+    // Convert to array and filter out offline users immediately
+    const fiveMinutesAgoDate = new Date(Date.now() - 5 * 60 * 1000);
     const onlineUsersArray = Array.from(uniqueUsers.values())
+      .filter(user => {
+        // Only include users active within last 5 minutes
+        if (!user.last_activity) return false;
+        const activityTime = new Date(user.last_activity);
+        return activityTime >= fiveMinutesAgoDate;
+      })
       .sort((a, b) => new Date(b.last_activity) - new Date(a.last_activity));
 
     // Set names for users without names and ensure all fields are set
@@ -1829,12 +1836,12 @@ async function loadOnlineUsers() {
       if (!user.user_agent) {
         user.user_agent = 'Unknown';
       }
+      // Ensure is_active is set correctly
+      const activityTime = new Date(user.last_activity);
+      user.is_active = activityTime >= fiveMinutesAgoDate;
     });
-    
-    // Sort by last activity (most recent first)
-    onlineUsersArray.sort((a, b) => new Date(b.last_activity) - new Date(a.last_activity));
 
-    // Store globally
+    // Store globally - only online users
     window.allOnlineUsers = onlineUsersArray;
 
     console.log('✅ Online users loaded:', {
@@ -1860,22 +1867,30 @@ function renderOnlineUsersTable() {
   const tbody = document.getElementById('online-users-table');
   if (!tbody || !window.allOnlineUsers) return;
   
-  // Filter out users who are no longer online (more than 5 minutes ago)
+  // Double-check and filter out any offline users (fresh check)
   const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
   const currentlyOnlineUsers = window.allOnlineUsers.filter(user => {
-    if (!user.last_activity) return false;
+    if (!user || !user.last_activity) return false;
     const activityTime = new Date(user.last_activity);
-    return activityTime >= fiveMinutesAgo;
+    const isOnline = activityTime >= fiveMinutesAgo;
+    
+    // Update is_active status
+    if (user) {
+      user.is_active = isOnline;
+    }
+    
+    return isOnline;
   });
   
-  // Update global array to only include online users
+  // Update global array to only include currently online users
   window.allOnlineUsers = currentlyOnlineUsers;
   
   if (currentlyOnlineUsers.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-info">No users online right now</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-info">📭 No users online right now</td></tr>';
     return;
   }
 
+  // Show all online users
   tbody.innerHTML = currentlyOnlineUsers.map((user) => {
     const escapeHtml = (text) => {
       if (!text) return 'N/A';

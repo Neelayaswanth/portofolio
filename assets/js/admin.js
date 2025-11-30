@@ -631,11 +631,24 @@ async function loadUserGivenData() {
     const { data: responses, error } = await supabase
       .from('visitor_responses')
       .select('*')
-      .order('response_time', { ascending: false });
+      .order('response_time', { ascending: false })
+      .limit(1000); // Limit to prevent huge queries
 
     if (error) {
-      console.error('Error loading user given data:', error);
-      tbody.innerHTML = `<tr><td colspan="5" class="text-center text-warning">⚠️ Error loading data: ${error.message}</td></tr>`;
+      console.error('❌ Error loading user given data:', error);
+      console.error('Error details:', {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint
+      });
+      
+      // Check if table doesn't exist
+      if (error.message && (error.message.includes('relation') || error.message.includes('does not exist'))) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-warning">⚠️ Table "visitor_responses" does not exist. Please run the SQL schema file in Supabase.</td></tr>';
+      } else {
+        tbody.innerHTML = `<tr><td colspan="5" class="text-center text-warning">⚠️ Error loading data: ${error.message}</td></tr>`;
+      }
       
       // Set stats to 0 on error
       const uniqueCountEl = document.getElementById('user-unique-count');
@@ -648,6 +661,15 @@ async function loadUserGivenData() {
     }
 
     console.log('User given data loaded:', responses?.length || 0, 'responses');
+    
+    // If no data, check if table exists
+    if (!responses || responses.length === 0) {
+      console.warn('⚠️ No responses found. Possible reasons:');
+      console.warn('1. Table "visitor_responses" might not exist - run visitor-responses-schema.sql in Supabase');
+      console.warn('2. RLS policies might be blocking access - check Supabase policies');
+      console.warn('3. No users have submitted the first-visit modal yet');
+      console.warn('4. Check browser console when submitting the modal for insert errors');
+    }
 
     if (!responses || responses.length === 0) {
       tbody.innerHTML = '<tr><td colspan="5" class="text-center text-info">📭 No user responses yet.</td></tr>';

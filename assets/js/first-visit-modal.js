@@ -154,19 +154,43 @@
 
         const isActuallyFirstVisit = !existingVisitor || existingVisitor.visit_count === 1;
 
-        await supabase.from('visitor_responses').insert({
-          visitor_id: uniqueVisitorId,
-          visitor_name: visitorName || null,
+        console.log('Saving visitor response to database...', {
+          visitor_id: uniqueVisitorId.substring(0, 20),
+          visitor_name: visitorName || 'not provided',
           user_response: isFirstTime,
-          actual_first_visit: isActuallyFirstVisit,
-          session_id: sessionId,
-          ip_address: ipAddress,
-          user_agent: navigator.userAgent || 'unknown',
-          response_time: new Date().toISOString()
+          actual_first_visit: isActuallyFirstVisit
         });
+
+        const { data: insertData, error: insertError } = await supabase
+          .from('visitor_responses')
+          .insert({
+            visitor_id: uniqueVisitorId,
+            visitor_name: visitorName || null,
+            user_response: isFirstTime,
+            actual_first_visit: isActuallyFirstVisit,
+            session_id: sessionId,
+            ip_address: ipAddress,
+            user_agent: navigator.userAgent || 'unknown',
+            response_time: new Date().toISOString()
+          })
+          .select();
+
+        if (insertError) {
+          console.error('❌ Error saving visitor response:', insertError);
+          console.error('Error details:', {
+            message: insertError.message,
+            code: insertError.code,
+            details: insertError.details,
+            hint: insertError.hint
+          });
+        } else {
+          console.log('✅ Visitor response saved successfully!', insertData);
+        }
+      } else {
+        console.warn('⚠️ Supabase client not available, response saved locally only');
       }
     } catch (e) {
-      console.error('Error saving response:', e);
+      console.error('❌ Error saving response:', e);
     }
 
     if (typeof showToast === 'function') {

@@ -1764,13 +1764,11 @@ async function loadOnlineUsers() {
       const ip = view.ip_address;
       if (!ip || ip === 'unknown') return;
       
-      // Create unique key: IP + session_id (or IP + timestamp if no session_id)
-      // This ensures we capture all unique users, even if they share an IP
-      const uniqueKey = view.session_id 
-        ? `${ip}_${view.session_id}` 
-        : `${ip}_${new Date(view.viewed_at).getTime()}`;
+      // Use IP address as unique key - each unique IP = one user/viewer
+      // This ensures we show ALL unique users (different IPs = different users)
+      const uniqueKey = ip;
       
-      // If this user/session already exists, update it only if this view is more recent
+      // If this IP already exists, update it only if this view is more recent
       if (uniqueUsers.has(uniqueKey)) {
         const existing = uniqueUsers.get(uniqueKey);
         const existingTime = new Date(existing.last_activity);
@@ -1815,16 +1813,16 @@ async function loadOnlineUsers() {
           last_activity: view.viewed_at,
           current_page: currentPage,
           user_agent: view.user_agent || 'Unknown',
-          is_active: true,
-          unique_key: uniqueKey // Store for debugging
+          is_active: true
         });
       }
     });
     
     console.log('🔍 Processing views:', {
       totalViews: recentViews.length,
-      uniqueKeysCreated: uniqueUsers.size,
-      uniqueIPs: new Set(recentViews.map(v => v.ip_address).filter(ip => ip && ip !== 'unknown')).size
+      uniqueUsersFound: uniqueUsers.size,
+      uniqueIPs: new Set(recentViews.map(v => v.ip_address).filter(ip => ip && ip !== 'unknown')).size,
+      sampleIPs: Array.from(new Set(recentViews.map(v => v.ip_address).filter(ip => ip && ip !== 'unknown'))).slice(0, 5)
     });
 
     // Convert to array and filter out offline users immediately

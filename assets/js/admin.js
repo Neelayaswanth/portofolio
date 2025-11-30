@@ -1764,9 +1764,12 @@ async function loadOnlineUsers() {
       const ip = view.ip_address;
       if (!ip || ip === 'unknown') return;
       
-      // Use IP address as unique key - each unique IP = one user/viewer
+      // Normalize IP address (trim, lowercase) to ensure proper deduplication
+      const normalizedIP = ip.trim().toLowerCase();
+      
+      // Use normalized IP address as unique key - each unique IP = one user/viewer
       // This ensures we show ALL unique users (different IPs = different users)
-      const uniqueKey = ip;
+      const uniqueKey = normalizedIP;
       
       // If this IP already exists, update it only if this view is more recent
       if (uniqueUsers.has(uniqueKey)) {
@@ -1806,8 +1809,8 @@ async function loadOnlineUsers() {
         const visitorName = nameMap.get(ip) || nameMap.get(view.session_id) || nameMap.get(view.ip_address);
         
         uniqueUsers.set(uniqueKey, {
-          ip_address: ip,
-          visitor_id: ip,
+          ip_address: normalizedIP, // Store normalized IP
+          visitor_id: normalizedIP, // Use normalized IP as visitor_id
           session_id: view.session_id || 'No Session',
           name: visitorName || null,
           last_activity: view.viewed_at,

@@ -1827,14 +1827,43 @@ async function loadOnlineUsers() {
 
     // Convert to array and filter out offline users immediately
     const fiveMinutesAgoDate = new Date(Date.now() - 5 * 60 * 1000);
-    const onlineUsersArray = Array.from(uniqueUsers.values())
+    let onlineUsersArray = Array.from(uniqueUsers.values())
       .filter(user => {
         // Only include users active within last 5 minutes
-        if (!user.last_activity) return false;
+        if (!user || !user.last_activity) return false;
         const activityTime = new Date(user.last_activity);
         return activityTime >= fiveMinutesAgoDate;
       })
       .sort((a, b) => new Date(b.last_activity) - new Date(a.last_activity));
+
+    // Final deduplication: Ensure no duplicate IPs or visitor IDs
+    const seenIPs = new Set();
+    const seenVisitorIDs = new Set();
+    onlineUsersArray = onlineUsersArray.filter(user => {
+      if (!user || !user.ip_address) return false;
+      
+      // Normalize IP address (trim, lowercase)
+      const normalizedIP = user.ip_address.trim().toLowerCase();
+      
+      // Check for duplicate IP
+      if (seenIPs.has(normalizedIP)) {
+        console.warn('⚠️ Duplicate IP found and removed:', normalizedIP);
+        return false;
+      }
+      
+      // Check for duplicate visitor_id if it exists
+      if (user.visitor_id) {
+        const normalizedVisitorID = user.visitor_id.trim().toLowerCase();
+        if (seenVisitorIDs.has(normalizedVisitorID)) {
+          console.warn('⚠️ Duplicate visitor_id found and removed:', normalizedVisitorID);
+          return false;
+        }
+        seenVisitorIDs.add(normalizedVisitorID);
+      }
+      
+      seenIPs.add(normalizedIP);
+      return true;
+    });
 
     // Set names for users without names and ensure all fields are set
     onlineUsersArray.forEach(user => {
@@ -1857,10 +1886,12 @@ async function loadOnlineUsers() {
 
     console.log('✅ Online users loaded:', {
       totalViews: recentViews?.length || 0,
-      uniqueOnlineUsers: onlineUsersArray.length,
+      uniqueUsersInMap: uniqueUsers.size,
+      uniqueOnlineUsersAfterFilter: onlineUsersArray.length,
       users: onlineUsersArray.map(u => ({
         ip: u.ip_address?.substring(0, 15) || 'unknown',
         name: u.name || 'Anonymous',
+        visitorID: u.visitor_id?.substring(0, 15) || 'unknown',
         lastActivity: u.last_activity,
         isActive: u.is_active
       }))

@@ -1764,14 +1764,15 @@ async function loadOnlineUsers() {
       const ip = view.ip_address;
       if (!ip || ip === 'unknown') return;
       
-      // Normalize IP address (trim, lowercase) to ensure proper deduplication
+      // Normalize IP address
       const normalizedIP = ip.trim().toLowerCase();
       
-      // Use normalized IP address as unique key - each unique IP = one user/viewer
-      // This ensures we show ALL unique users (different IPs = different users)
-      const uniqueKey = normalizedIP;
+      // Use session_id as primary unique identifier - each session = one unique user/viewer
+      // Fallback to IP + timestamp if no session_id
+      const sessionId = view.session_id || null;
+      const uniqueKey = sessionId || `${normalizedIP}_${new Date(view.viewed_at).getTime()}`;
       
-      // If this IP already exists, update it only if this view is more recent
+      // If this session/user already exists, update it only if this view is more recent
       if (uniqueUsers.has(uniqueKey)) {
         const existing = uniqueUsers.get(uniqueKey);
         const existingTime = new Date(existing.last_activity);
@@ -1795,7 +1796,7 @@ async function loadOnlineUsers() {
           }
         }
       } else {
-        // New viewer - add to list (this ensures ALL users are added)
+        // New viewer/session - add to list (each unique session = one user)
         let currentPage = '/';
         try {
           if (view.referrer && view.referrer !== 'direct' && view.referrer !== 'Direct') {
@@ -1806,12 +1807,16 @@ async function loadOnlineUsers() {
           currentPage = '/';
         }
         
-        const visitorName = nameMap.get(ip) || nameMap.get(view.session_id) || nameMap.get(view.ip_address);
+        // Get visitor name - try session_id first, then IP
+        const visitorName = nameMap.get(sessionId) || nameMap.get(normalizedIP) || nameMap.get(ip) || null;
+        
+        // Use session_id as visitor_id if available, otherwise use IP
+        const visitorId = sessionId || normalizedIP;
         
         uniqueUsers.set(uniqueKey, {
-          ip_address: normalizedIP, // Store normalized IP
-          visitor_id: normalizedIP, // Use normalized IP as visitor_id
-          session_id: view.session_id || 'No Session',
+          ip_address: normalizedIP,
+          visitor_id: visitorId, // Use session_id as visitor_id for uniqueness
+          session_id: sessionId || 'No Session',
           name: visitorName || null,
           last_activity: view.viewed_at,
           current_page: currentPage,
@@ -1839,22 +1844,13 @@ async function loadOnlineUsers() {
       })
       .sort((a, b) => new Date(b.last_activity) - new Date(a.last_activity));
 
-    // Final deduplication: Ensure no duplicate IPs or visitor IDs
-    const seenIPs = new Set();
+    // Final deduplication: Ensure no duplicate visitor IDs or session IDs
     const seenVisitorIDs = new Set();
+    const seenSessionIDs = new Set();
     onlineUsersArray = onlineUsersArray.filter(user => {
-      if (!user || !user.ip_address) return false;
+      if (!user) return false;
       
-      // Normalize IP address (trim, lowercase)
-      const normalizedIP = user.ip_address.trim().toLowerCase();
-      
-      // Check for duplicate IP
-      if (seenIPs.has(normalizedIP)) {
-        console.warn('⚠️ Duplicate IP found and removed:', normalizedIP);
-        return false;
-      }
-      
-      // Check for duplicate visitor_id if it exists
+      // Primary deduplication by visitor_id (session_id if available, otherwise IP)
       if (user.visitor_id) {
         const normalizedVisitorID = user.visitor_id.trim().toLowerCase();
         if (seenVisitorIDs.has(normalizedVisitorID)) {
@@ -1864,7 +1860,16 @@ async function loadOnlineUsers() {
         seenVisitorIDs.add(normalizedVisitorID);
       }
       
-      seenIPs.add(normalizedIP);
+      // Secondary check by session_id
+      if (user.session_id && user.session_id !== 'No Session') {
+        const normalizedSessionID = user.session_id.trim().toLowerCase();
+        if (seenSessionIDs.has(normalizedSessionID)) {
+          console.warn('⚠️ Duplicate session_id found and removed:', normalizedSessionID);
+          return false;
+        }
+        seenSessionIDs.add(normalizedSessionID);
+      }
+      
       return true;
     });
 

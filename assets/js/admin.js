@@ -686,11 +686,13 @@ async function loadUserGivenData() {
     }
 
     // Calculate stats
-    const uniqueVisitors = new Set(responses.map(r => r.visitor_id || r.session_id)).size;
+    // Unique visitors: Only count those who responded "First Time" (user_response = true)
+    const firstTimeResponses = responses.filter(r => r.user_response === true);
+    const uniqueVisitors = new Set(firstTimeResponses.map(r => r.visitor_id || r.session_id)).size;
     const totalResponses = responses.length;
     const withNames = responses.filter(r => r.visitor_name && r.visitor_name.trim()).length;
 
-    console.log('User given stats:', { uniqueVisitors, totalResponses, withNames });
+    console.log('User given stats:', { uniqueVisitors, totalResponses, withNames, firstTimeCount: firstTimeResponses.length });
 
     // Display stats
     const uniqueCountEl = document.getElementById('user-unique-count');
@@ -788,7 +790,8 @@ async function loadActualData() {
   await Promise.all([
     loadActualVisitors(),
     loadActualViews(),
-    loadActualMessages()
+    loadActualMessages(),
+    loadOnlineUsers()
   ]);
 }
 
@@ -1161,7 +1164,15 @@ function showActualMessageModal(messageId) {
   document.getElementById('actual-modal-subject').textContent = message.subject || 'No Subject';
   document.getElementById('actual-modal-date').textContent = message.created_at ? new Date(message.created_at).toLocaleString() : 'N/A';
   document.getElementById('actual-modal-status').innerHTML = `<span class="badge ${isRead ? 'bg-success' : 'bg-warning'}">${isRead ? 'Read' : 'Unread'}</span>`;
-  document.getElementById('actual-modal-message').textContent = message.message || 'No message content';
+  // Display full message with proper formatting
+  const messageEl = document.getElementById('actual-modal-message');
+  if (messageEl) {
+    messageEl.textContent = message.message || 'No message content';
+    messageEl.style.whiteSpace = 'pre-wrap';
+    messageEl.style.wordWrap = 'break-word';
+    messageEl.style.maxHeight = '500px';
+    messageEl.style.overflowY = 'auto';
+  }
   
   // Set up mark as read button
   const markReadBtn = document.getElementById('actual-modal-mark-read-btn');
@@ -1226,6 +1237,16 @@ async function markMessageRead(messageId) {
     // Reload analytics to update count
     await loadAnalytics();
 
+    // Close modal if open
+    const modal = document.getElementById('actualMessageModal');
+    if (modal) {
+      const bsModal = bootstrap.Modal.getInstance(modal);
+      if (bsModal) bsModal.hide();
+    }
+
+    // Show success message
+    alert('Message marked as read!');
+
     console.log('✅ Message marked as read');
   } catch (error) {
     console.error('❌ Error marking message as read:', error);
@@ -1266,6 +1287,16 @@ async function deleteActualMessage(messageId) {
     
     // Reload analytics to update count
     await loadAnalytics();
+
+    // Close modal if open
+    const modal = document.getElementById('actualMessageModal');
+    if (modal) {
+      const bsModal = bootstrap.Modal.getInstance(modal);
+      if (bsModal) bsModal.hide();
+    }
+
+    // Show success message
+    alert('Message deleted successfully!');
 
     console.log('✅ Message deleted');
   } catch (error) {
@@ -1639,4 +1670,140 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   }, 30000);
 });
+
+// Load Online Users (active in last 5 minutes)
+async function loadOnlineUsers() {
+  const tbody = document.getElementById('online-users-table');
+  if (!tbody) return;
+  
+  const supabase = getSupabaseClient();
+  if (!supabase) {
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger">Database connection error</td></tr>';
+    return;
+  }
+
+  try {
+    // Get last 5 minutes timestamp
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+    
+    // Query recent profile views (active users)
+    const { data: recentViews, error } = await supabase
+      .from('profile_views')
+      .select('ip_address, viewed_at, referrer, user_agent')
+      .gte('viewed_at', fiveMinutesAgo)
+      .order('viewed_at', { ascending: false });
+
+    if (error) {
+      throw error;
+    }
+
+    // Group by IP to get unique active users
+    const uniqueUsers = new Map();
+    recentViews?.forEach(view => {
+      const ip = view.ip_address || 'unknown';
+      if (!uniqueUsers.has(ip)) {
+        uniqueUsers.set(ip, {
+          ip_address: ip,
+          last_activity: view.viewed_at,
+          referrer: view.referrer || 'Direct',
+          user_agent: view.user_agent || 'Unknown'
+        });
+      } else {
+        // Update if this is more recent
+        const existing = uniqueUsers.get(ip);
+        if (new Date(view.viewed_at) > new Date(existing.last_activity)) {
+          existing.last_activity = view.viewed_at;
+          existing.referrer = view.referrer || existing.referrer;
+        }
+      }
+    });
+
+    // Get visitor names from visitor_responses if available
+    const onlineUsersArray = Array.from(uniqueUsers.values());
+    if (onlineUsersArray.length > 0) {
+      const ips = onlineUsersArray.map(u => u.ip_address);
+      const { data: responses } = await supabase
+        .from('visitor_responses')
+        .select('visitor_id, visitor_name')
+        .in('visitor_id', ips)
+        .not('visitor_name', 'is', null);
+
+      // Map names to users
+      if (responses) {
+        const nameMap = new Map();
+        responses.forEach(r => {
+          if (r.visitor_name && !nameMap.has(r.visitor_id)) {
+            nameMap.set(r.visitor_id, r.visitor_name);
+          }
+        });
+
+        onlineUsersArray.forEach(user => {
+          user.name = nameMap.get(user.ip_address) || 'Anonymous';
+        });
+      }
+    }
+
+    // Store globally
+    window.allOnlineUsers = onlineUsersArray;
+
+    // Render table
+    renderOnlineUsersTable();
+
+  } catch (err) {
+    console.error('Error loading online users:', err);
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger">Error loading online users</td></tr>';
+  }
+}
+
+// Render Online Users Table
+function renderOnlineUsersTable() {
+  const tbody = document.getElementById('online-users-table');
+  if (!tbody || !window.allOnlineUsers) return;
+  
+  if (window.allOnlineUsers.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-info">No users online right now</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = window.allOnlineUsers.map((user) => {
+    const escapeHtml = (text) => {
+      if (!text) return 'N/A';
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    };
+
+    const lastActivity = user.last_activity ? new Date(user.last_activity).toLocaleString() : 'N/A';
+    const timeAgo = user.last_activity ? getTimeAgo(new Date(user.last_activity)) : 'N/A';
+    const userAgent = user.user_agent || 'Unknown';
+    const shortUserAgent = userAgent.length > 50 ? userAgent.substring(0, 50) + '...' : userAgent;
+    const currentPage = user.referrer && user.referrer !== 'direct' ? new URL(user.referrer).pathname : '/';
+    
+    return `
+      <tr>
+        <td>${escapeHtml(user.ip_address.substring(0, 15))}${user.ip_address.length > 15 ? '...' : ''}</td>
+        <td>${escapeHtml(user.name || 'Anonymous')}</td>
+        <td>${lastActivity}<br><small class="text-muted">${timeAgo} ago</small></td>
+        <td>${escapeHtml(currentPage)}</td>
+        <td title="${escapeHtml(userAgent)}">${escapeHtml(shortUserAgent)}</td>
+        <td><span class="badge bg-success"><i class="bi bi-circle-fill" style="font-size: 8px;"></i> Online</span></td>
+      </tr>
+    `;
+  }).join('');
+}
+
+// Helper function to get time ago string
+function getTimeAgo(date) {
+  const seconds = Math.floor((new Date() - date) / 1000);
+  if (seconds < 60) return seconds + 's';
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return minutes + 'm';
+  const hours = Math.floor(minutes / 60);
+  return hours + 'h';
+}
+
+// Make message functions globally accessible for onclick handlers
+window.showActualMessageModal = showActualMessageModal;
+window.markMessageRead = markMessageRead;
+window.deleteActualMessage = deleteActualMessage;
 

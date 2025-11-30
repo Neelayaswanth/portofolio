@@ -546,18 +546,6 @@
       <i class="bi bi-info-circle"></i> <span id="status-message"></span>
     </div>
     
-      <!-- Quick Links -->
-      <div class="mb-4">
-        <a href="visitors.html" class="btn btn-outline-light me-2 mb-2">
-          <i class="bi bi-people"></i> Unique Visitors
-        </a>
-        <a href="activities.html" class="btn btn-outline-light me-2 mb-2">
-          <i class="bi bi-eye"></i> Recent Activities
-        </a>
-        <a href="messages.html" class="btn btn-outline-light mb-2">
-          <i class="bi bi-envelope"></i> Messages
-        </a>
-      </div>
 
       <!-- Section 1: User Given Data -->
       <div class="data-card mb-4" style="border: 2px solid var(--admin-primary);">
@@ -649,17 +637,22 @@
         <ul class="nav nav-tabs mb-3" id="actual-data-tabs" role="tablist">
           <li class="nav-item" role="presentation">
             <button class="nav-link active" id="visitors-tab" data-bs-toggle="tab" data-bs-target="#visitors-pane" type="button" role="tab">
-              <i class="bi bi-people"></i> Visitors (10)
+              <i class="bi bi-people"></i> Visitors
             </button>
           </li>
           <li class="nav-item" role="presentation">
             <button class="nav-link" id="views-tab" data-bs-toggle="tab" data-bs-target="#views-pane" type="button" role="tab">
-              <i class="bi bi-eye"></i> Profile Views (10)
+              <i class="bi bi-eye"></i> Profile Views
             </button>
           </li>
           <li class="nav-item" role="presentation">
             <button class="nav-link" id="messages-tab" data-bs-toggle="tab" data-bs-target="#messages-pane" type="button" role="tab">
-              <i class="bi bi-envelope"></i> Messages (10)
+              <i class="bi bi-envelope"></i> Messages
+            </button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link" id="online-users-tab" data-bs-toggle="tab" data-bs-target="#online-users-pane" type="button" role="tab">
+              <i class="bi bi-wifi"></i> Online Users
             </button>
           </li>
         </ul>
@@ -745,6 +738,32 @@
               <button class="btn btn-outline-light" id="messages-view-more-btn" onclick="toggleActualMessagesView()">
                 <i class="bi bi-chevron-down" id="messages-view-more-icon"></i> View More
               </button>
+            </div>
+          </div>
+
+          <!-- Online Users Tab -->
+          <div class="tab-pane fade" id="online-users-pane" role="tabpanel">
+            <div class="table-responsive">
+              <table class="table table-dark table-hover">
+                <thead>
+                  <tr>
+                    <th>Visitor ID</th>
+                    <th>Name</th>
+                    <th>Last Activity</th>
+                    <th>Current Page</th>
+                    <th>User Agent</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody id="online-users-table">
+                  <tr>
+                    <td colspan="6" class="text-center">Loading...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="text-center mt-3">
+              <small class="text-muted">Users active in the last 5 minutes</small>
             </div>
           </div>
         </div>

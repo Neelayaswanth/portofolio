@@ -1,9 +1,13 @@
 -- ============================================
--- CREATE VISITOR RESPONSES TABLE
+-- CREATE VISITOR RESPONSES TABLE (FIXED VERSION)
 -- Run this entire file in Supabase SQL Editor
 -- ============================================
 
--- Step 1: Create the visitor_responses table
+-- Step 1: Drop table if it exists (to start fresh)
+-- Remove the DROP TABLE line below if you want to keep existing data
+-- DROP TABLE IF EXISTS visitor_responses CASCADE;
+
+-- Step 2: Create the visitor_responses table
 CREATE TABLE IF NOT EXISTS visitor_responses (
     id BIGSERIAL PRIMARY KEY,
     visitor_id VARCHAR(255) NOT NULL,
@@ -17,23 +21,34 @@ CREATE TABLE IF NOT EXISTS visitor_responses (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Step 2: Create indexes for efficient queries
+-- Step 3: Add visitor_name column if it doesn't exist (in case table was created earlier)
+DO $$ 
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'public' 
+        AND table_name = 'visitor_responses' 
+        AND column_name = 'visitor_name'
+    ) THEN
+        ALTER TABLE visitor_responses ADD COLUMN visitor_name VARCHAR(100);
+    END IF;
+END $$;
+
+-- Step 4: Create indexes for efficient queries
 CREATE INDEX IF NOT EXISTS idx_visitor_responses_visitor_id ON visitor_responses(visitor_id);
 CREATE INDEX IF NOT EXISTS idx_visitor_responses_response_time ON visitor_responses(response_time DESC);
 CREATE INDEX IF NOT EXISTS idx_visitor_responses_user_response ON visitor_responses(user_response);
 CREATE INDEX IF NOT EXISTS idx_visitor_responses_actual_first_visit ON visitor_responses(actual_first_visit);
--- Note: Partial index for visitor_name only if the column exists and has non-null values
--- This index is optional and can be created separately if needed
 
--- Step 3: Enable Row Level Security (RLS)
+-- Step 5: Enable Row Level Security (RLS)
 ALTER TABLE visitor_responses ENABLE ROW LEVEL SECURITY;
 
--- Step 4: Drop existing policies if they exist (to avoid conflicts)
+-- Step 6: Drop existing policies if they exist (to avoid conflicts)
 DROP POLICY IF EXISTS "Allow anonymous insert on visitor_responses" ON visitor_responses;
 DROP POLICY IF EXISTS "Allow anonymous select on visitor_responses" ON visitor_responses;
 DROP POLICY IF EXISTS "Allow service role full access on visitor_responses" ON visitor_responses;
 
--- Step 5: Create RLS policies for anonymous access
+-- Step 7: Create RLS policies for anonymous access
 -- Allow anonymous users to insert their responses
 CREATE POLICY "Allow anonymous insert on visitor_responses"
   ON visitor_responses FOR INSERT
@@ -53,12 +68,12 @@ CREATE POLICY "Allow service role full access on visitor_responses"
   USING (true)
   WITH CHECK (true);
 
--- Step 6: Grant necessary permissions
+-- Step 8: Grant necessary permissions
 GRANT USAGE ON SCHEMA public TO anon;
 GRANT SELECT, INSERT ON visitor_responses TO anon;
 GRANT ALL ON visitor_responses TO service_role;
 
--- Step 7: Verify table was created
+-- Step 9: Verify table was created
 SELECT 
     'Table created successfully!' AS status,
     COUNT(*) AS current_rows
@@ -66,7 +81,7 @@ FROM visitor_responses;
 
 -- ============================================
 -- VERIFICATION QUERIES
--- Run these to verify everything is set up correctly
+-- Run these separately to verify everything is set up correctly
 -- ============================================
 
 -- Check if table exists
@@ -76,6 +91,16 @@ SELECT
 FROM information_schema.tables 
 WHERE table_schema = 'public' 
     AND table_name = 'visitor_responses';
+
+-- Check all columns in the table
+SELECT 
+    column_name,
+    data_type,
+    is_nullable
+FROM information_schema.columns
+WHERE table_schema = 'public' 
+    AND table_name = 'visitor_responses'
+ORDER BY ordinal_position;
 
 -- Check RLS policies
 SELECT 
@@ -92,34 +117,4 @@ SELECT
 FROM pg_indexes 
 WHERE tablename = 'visitor_responses'
 ORDER BY indexname;
-
--- ============================================
--- TEST INSERT (Optional - you can delete this after testing)
--- ============================================
-
--- Uncomment the lines below to test insert functionality:
-/*
-INSERT INTO visitor_responses (
-    visitor_id,
-    visitor_name,
-    user_response,
-    actual_first_visit,
-    session_id,
-    ip_address,
-    user_agent,
-    response_time
-) VALUES (
-    'test_visitor_001',
-    'Test User',
-    true,
-    true,
-    'test_session_001',
-    '127.0.0.1',
-    'Test Browser',
-    NOW()
-);
-
--- Check if test data was inserted
-SELECT * FROM visitor_responses ORDER BY response_time DESC LIMIT 5;
-*/
 

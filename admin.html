@@ -352,6 +352,37 @@
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
     }
 
+    /* Tab Styling */
+    .nav-tabs {
+      border-bottom: 2px solid var(--admin-border);
+      margin-bottom: 20px;
+    }
+
+    .nav-tabs .nav-link {
+      color: var(--admin-text-muted);
+      background-color: transparent;
+      border: none;
+      border-bottom: 3px solid transparent;
+      padding: 12px 20px;
+      transition: all 0.3s ease;
+      font-weight: 500;
+    }
+
+    .nav-tabs .nav-link:hover {
+      color: var(--admin-primary);
+      border-bottom-color: rgba(236, 236, 236, 0.3);
+    }
+
+    .nav-tabs .nav-link.active {
+      color: var(--admin-primary);
+      background-color: transparent;
+      border-bottom-color: var(--admin-primary);
+    }
+
+    .tab-content {
+      min-height: 300px;
+    }
+
     .btn-primary {
       background: linear-gradient(135deg, var(--admin-primary) 0%, var(--admin-secondary) 100%);
       color: #1f1f1f;
@@ -528,122 +559,196 @@
         </a>
       </div>
 
-      <!-- Stats Cards -->
-      <div class="row mb-4" id="stats-container">
-        <div class="col-lg-4 col-md-6 mb-4">
-        <div class="stat-card">
-            <div class="stat-icon">
-              <i class="bi bi-eye"></i>
-            </div>
-          <div class="stat-number" id="total-views">-</div>
-          <div class="stat-label">Total Profile Views</div>
-        </div>
-      </div>
-        <div class="col-lg-4 col-md-6 mb-4">
-        <div class="stat-card">
-            <div class="stat-icon">
-              <i class="bi bi-people"></i>
-            </div>
-          <div class="stat-number" id="unique-visitors">-</div>
-          <div class="stat-label">Unique Visitors</div>
-        </div>
-      </div>
-        <div class="col-lg-4 col-md-6 mb-4">
-        <div class="stat-card">
-            <div class="stat-icon">
-              <i class="bi bi-envelope"></i>
-            </div>
-          <div class="stat-number" id="total-messages">-</div>
-          <div class="stat-label">Messages Received</div>
-        </div>
-      </div>
-    </div>
-
-      <!-- Recent Visitor Activity -->
-      <div class="data-card">
+      <!-- Section 1: User Given Data -->
+      <div class="data-card mb-4" style="border: 2px solid var(--admin-primary);">
         <div class="data-card-header">
-          <h3><i class="bi bi-people"></i> Recent Visitor Activity</h3>
-              <button class="btn btn-sm btn-outline-light" id="visitors-view-more-btn" onclick="toggleVisitorsView()" style="display: none;">
-                <i class="bi bi-chevron-down" id="visitors-view-more-icon"></i> View More
-              </button>
+          <h2 style="color: var(--admin-primary); margin: 0;">
+            <i class="bi bi-person-circle"></i> User Given Data
+          </h2>
+        </div>
+        
+        <!-- User Given Stats -->
+        <div class="row mb-3" style="padding: 20px 0;">
+          <div class="col-md-4">
+            <div class="text-center">
+              <div class="stat-number" id="user-unique-count" style="font-size: 2.5rem; color: var(--admin-primary); font-weight: 700;">-</div>
+              <div class="stat-label">Unique Visitors (User Responses)</div>
             </div>
+          </div>
+          <div class="col-md-4">
+            <div class="text-center">
+              <div class="stat-number" id="user-total-count" style="font-size: 2.5rem; color: var(--admin-primary); font-weight: 700;">-</div>
+              <div class="stat-label">Total Responses</div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="text-center">
+              <div class="stat-number" id="user-with-names-count" style="font-size: 2.5rem; color: var(--admin-primary); font-weight: 700;">-</div>
+              <div class="stat-label">Users Who Provided Name</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- User Given Data Table -->
+        <div class="table-responsive">
+          <table class="table table-dark table-hover">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Visitor ID</th>
+                <th>User Response</th>
+                <th>Actual Status</th>
+                <th>Response Time</th>
+              </tr>
+            </thead>
+            <tbody id="user-given-table">
+              <tr>
+                <td colspan="5" class="text-center">Loading...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="text-center mt-3" id="user-given-view-more-container" style="display: none;">
+          <button class="btn btn-outline-light" id="user-given-view-more-btn" onclick="toggleUserGivenView()">
+            <i class="bi bi-chevron-down" id="user-given-view-more-icon"></i> View More
+          </button>
+        </div>
+      </div>
+
+      <!-- Section 2: Actual Data -->
+      <div class="data-card" style="border: 2px solid var(--admin-secondary);">
+        <div class="data-card-header">
+          <h2 style="color: var(--admin-secondary); margin: 0;">
+            <i class="bi bi-database"></i> Actual Tracking Data
+          </h2>
+        </div>
+        
+        <!-- Actual Stats -->
+        <div class="row mb-3" style="padding: 20px 0;">
+          <div class="col-md-4">
+            <div class="text-center">
+              <div class="stat-number" id="actual-unique-count" style="font-size: 2.5rem; color: var(--admin-secondary); font-weight: 700;">-</div>
+              <div class="stat-label">Unique Visitors (Actual)</div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="text-center">
+              <div class="stat-number" id="actual-total-count" style="font-size: 2.5rem; color: var(--admin-secondary); font-weight: 700;">-</div>
+              <div class="stat-label">Total Profile Views</div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="text-center">
+              <div class="stat-number" id="actual-messages-count" style="font-size: 2.5rem; color: var(--admin-secondary); font-weight: 700;">-</div>
+              <div class="stat-label">Messages Received</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Actual Data Tables (Tabs) -->
+        <ul class="nav nav-tabs mb-3" id="actual-data-tabs" role="tablist">
+          <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="visitors-tab" data-bs-toggle="tab" data-bs-target="#visitors-pane" type="button" role="tab">
+              <i class="bi bi-people"></i> Visitors (10)
+            </button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link" id="views-tab" data-bs-toggle="tab" data-bs-target="#views-pane" type="button" role="tab">
+              <i class="bi bi-eye"></i> Profile Views (10)
+            </button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link" id="messages-tab" data-bs-toggle="tab" data-bs-target="#messages-pane" type="button" role="tab">
+              <i class="bi bi-envelope"></i> Messages (10)
+            </button>
+          </li>
+        </ul>
+
+        <div class="tab-content" id="actual-data-content">
+          <!-- Visitors Tab -->
+          <div class="tab-pane fade show active" id="visitors-pane" role="tabpanel">
             <div class="table-responsive">
               <table class="table table-dark table-hover">
                 <thead>
                   <tr>
-                <th>Visitor ID</th>
+                    <th>Visitor ID</th>
                     <th>First Visit</th>
                     <th>Last Visit</th>
                     <th>Visit Count</th>
                     <th>User Agent</th>
                   </tr>
                 </thead>
-                <tbody id="visitors-table">
+                <tbody id="actual-visitors-table">
                   <tr>
                     <td colspan="5" class="text-center">Loading...</td>
                   </tr>
                 </tbody>
               </table>
-        </div>
-      </div>
-
-      <!-- Recent Profile Views -->
-      <div class="data-card">
-        <div class="data-card-header">
-          <h3><i class="bi bi-eye"></i> Recent Profile Views</h3>
-              <button class="btn btn-sm btn-outline-light" id="views-view-more-btn" onclick="toggleViewsView()" style="display: none;">
-                <i class="bi bi-chevron-down" id="views-view-more-icon"></i> View More
+            </div>
+            <div class="text-center mt-3" id="visitors-view-more-container" style="display: none;">
+              <button class="btn btn-outline-light" id="visitors-view-more-btn" onclick="toggleActualVisitorsView()">
+                <i class="bi bi-chevron-down" id="visitors-view-more-icon"></i> View More
               </button>
             </div>
+          </div>
+
+          <!-- Profile Views Tab -->
+          <div class="tab-pane fade" id="views-pane" role="tabpanel">
             <div class="table-responsive">
               <table class="table table-dark table-hover">
                 <thead>
                   <tr>
-                <th>Visitor ID</th>
+                    <th>Visitor ID</th>
                     <th>View Time</th>
                     <th>Referrer</th>
                     <th>User Agent</th>
                   </tr>
                 </thead>
-                <tbody id="views-table">
+                <tbody id="actual-views-table">
                   <tr>
                     <td colspan="4" class="text-center">Loading...</td>
                   </tr>
                 </tbody>
               </table>
-        </div>
-      </div>
+            </div>
+            <div class="text-center mt-3" id="views-view-more-container" style="display: none;">
+              <button class="btn btn-outline-light" id="views-view-more-btn" onclick="toggleActualViewsView()">
+                <i class="bi bi-chevron-down" id="views-view-more-icon"></i> View More
+              </button>
+            </div>
+          </div>
 
-      <!-- Recent Messages -->
-      <div class="data-card">
-        <div class="data-card-header">
-          <h3><i class="bi bi-envelope"></i> Recent Messages</h3>
-              <button class="btn btn-sm btn-outline-light" id="messages-view-more-btn" onclick="toggleMessagesView()" style="display: none;">
+          <!-- Messages Tab -->
+          <div class="tab-pane fade" id="messages-pane" role="tabpanel">
+            <div class="table-responsive">
+              <table class="table table-dark table-hover">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Subject</th>
+                    <th>Message</th>
+                    <th>Date</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="actual-messages-table">
+                  <tr>
+                    <td colspan="8" class="text-center">Loading...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="text-center mt-3" id="messages-view-more-container" style="display: none;">
+              <button class="btn btn-outline-light" id="messages-view-more-btn" onclick="toggleActualMessagesView()">
                 <i class="bi bi-chevron-down" id="messages-view-more-icon"></i> View More
               </button>
             </div>
-          <div class="table-responsive">
-            <table class="table table-dark table-hover">
-              <thead>
-                <tr>
-                  <th>ID</th>
-                  <th>Name</th>
-                  <th>Email</th>
-                  <th>Subject</th>
-                  <th>Message</th>
-                  <th>Date</th>
-                  <th>Status</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody id="messages-table">
-                <tr>
-                  <td colspan="8" class="text-center">Loading...</td>
-                </tr>
-              </tbody>
-            </table>
+          </div>
+        </div>
       </div>
-    </div>
   </div>
   </div>
 

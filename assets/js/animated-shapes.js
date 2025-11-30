@@ -18,6 +18,18 @@
   function initAnimations() {
     // Hide main content initially
     hidePortfolioContent();
+    
+    // Hide cursor during animation (will be re-enabled after animation)
+    const cursor = document.getElementById('customCursor');
+    const cursorFollower = document.getElementById('customCursorFollower');
+    if (cursor) {
+      cursor.style.opacity = '0';
+      cursor.style.pointerEvents = 'none';
+    }
+    if (cursorFollower) {
+      cursorFollower.style.opacity = '0';
+      cursorFollower.style.pointerEvents = 'none';
+    }
 
     // Create fullscreen animation overlay
     const animationOverlay = document.createElement('div');
@@ -75,6 +87,50 @@
     
     // Re-enable scrolling
     document.body.style.overflow = '';
+    
+    // Ensure cursor is visible and functional after animation
+    setTimeout(() => {
+      const cursor = document.getElementById('customCursor');
+      const cursorFollower = document.getElementById('customCursorFollower');
+      
+      if (cursor) {
+        cursor.style.display = 'block';
+        cursor.style.opacity = '1';
+        cursor.style.visibility = 'visible';
+        cursor.style.zIndex = '9999999';
+        cursor.style.pointerEvents = 'none';
+      }
+      
+      if (cursorFollower) {
+        cursorFollower.style.display = 'block';
+        cursorFollower.style.opacity = '1';
+        cursorFollower.style.visibility = 'visible';
+        cursorFollower.style.zIndex = '9999998';
+        cursorFollower.style.pointerEvents = 'none';
+      }
+      
+      // Force cursor position update by triggering a mousemove event
+      // Get current mouse position from window if available
+      if (typeof window.mouseX !== 'undefined' && typeof window.mouseY !== 'undefined') {
+        const moveEvent = new MouseEvent('mousemove', {
+          clientX: window.mouseX,
+          clientY: window.mouseY,
+          bubbles: true,
+          cancelable: true,
+          view: window
+        });
+        document.dispatchEvent(moveEvent);
+      } else {
+        // Trigger a fake mousemove to wake up the cursor
+        document.dispatchEvent(new MouseEvent('mousemove', {
+          bubbles: true,
+          cancelable: true,
+          view: window
+        }));
+      }
+      
+      console.log('✅ Cursor re-enabled after animation');
+    }, 300);
     
     // Ensure we're at the top
     window.scrollTo(0, 0);
@@ -415,7 +471,7 @@
 
   // Create name animation
   function createNameAnimation(container) {
-    const nameChars = ['Y', 'A', 'S', 'H', 'N'];
+    const nameChars = ['Y', 'A', 'S', 'H', '❤️'];
     const nameColors = ['#22d3ee', '#d946ef', '#fde047', '#a3e636', '#ff6b35']; // cyan, fuchsia, yellow, lime, orange
     
     const nameWrapper = document.createElement('h1');
@@ -453,7 +509,7 @@
         // H: lime to orange (blending S and N) - vibrant transition
         gradient = `linear-gradient(135deg, ${nameColors[3]} 0%, ${nameColors[4]} 50%, ${nameColors[2]} 100%)`;
       } else {
-        // N (5th): orange to cyan (blending H and Y, circular) - full spectrum
+        // ❤️ (5th): orange to cyan (blending H and Y, circular) - full spectrum
         gradient = `linear-gradient(135deg, ${nameColors[4]} 0%, ${nameColors[0]} 50%, ${nameColors[3]} 100%)`;
       }
       
@@ -515,11 +571,11 @@
       }
     }, 1000);
 
-    // Stage 3: Show remaining letters (A, S, H, N) (2000ms)
+    // Stage 3: Show remaining letters (A, S, H, ❤️) (2000ms)
     setTimeout(() => {
       animationStage = stages.SHOW_ASH;
       
-      // Show remaining characters (A, S, H, N)
+      // Show remaining characters (A, S, H, ❤️)
       const nameChars = document.querySelectorAll('.name-char');
       nameChars.forEach((char, index) => {
         if (index > 0 && char.classList.contains('hidden')) {
@@ -556,12 +612,26 @@
           top: 0,
           behavior: 'smooth'
         });
+        
         // Remove overlay after fade completes and show portfolio
         setTimeout(() => {
           if (overlay.parentNode) {
             overlay.parentNode.removeChild(overlay);
+            console.log('✅ Animation overlay removed');
           }
           showPortfolioContent();
+          
+          // Trigger first visit modal IMMEDIATELY after overlay is removed
+          setTimeout(() => {
+            console.log('🎬 Animation complete! Showing first visit modal...');
+            if (typeof window.showFirstVisitModal === 'function') {
+              window.showFirstVisitModal();
+            } else if (typeof window.triggerFirstVisitModal === 'function') {
+              window.triggerFirstVisitModal();
+            } else {
+              console.error('❌ Modal functions not available!');
+            }
+          }, 500);
         }, 1000);
       }
     }, 4000);

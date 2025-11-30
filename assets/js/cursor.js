@@ -149,6 +149,10 @@
     mouseX = e.clientX;
     mouseY = e.clientY;
     
+    // Store globally for animation script to access
+    window.mouseX = mouseX;
+    window.mouseY = mouseY;
+    
     // Update cursor immediately
     cursor.style.left = mouseX + 'px';
     cursor.style.top = mouseY + 'px';
@@ -207,6 +211,8 @@
     cursorFollower.style.opacity = '1';
     cursor.style.display = 'block';
     cursorFollower.style.display = 'block';
+    cursor.style.zIndex = '9999999';
+    cursorFollower.style.zIndex = '9999998';
   });
 
   // Ensure cursor is visible when DOM is ready

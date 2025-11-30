@@ -256,80 +256,121 @@ async function loadAnalytics() {
     if (viewsResult.error) throw viewsResult.error;
     if (messagesResult.error) throw messagesResult.error;
 
-    // Calculate unique visitors - use visitors table (most accurate)
+    /**
+     * Calculate Unique Visitors - CLEAR AND RELIABLE METHOD
+     * 
+     * How it works:
+     * 1. The 'visitors' table stores one row per unique visitor
+     * 2. Each row has a unique 'ip_address' (enforced by database constraint)
+     * 3. For localhost: ip_address = 'session_XXXXX' (unique per session)
+     * 4. For real IPs: ip_address = actual IP address
+     * 5. We count distinct ip_address values from visitors who visited in last 30 days
+     */
     let uniqueVisitorsCount = 0;
     try {
-      // Count distinct visitors from visitors table (last 30 days)
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      
+      // Step 1: Get all visitors from visitors table
       const { data: allVisitors, error: visitorsError } = await supabase
         .from('visitors')
-        .select('id, visitor_id, ip_address, last_visit, first_visit');
+        .select('ip_address, last_visit, first_visit');
       
-      if (!visitorsError && allVisitors && allVisitors.length > 0) {
-        const thirtyDaysAgoTimestamp = thirtyDaysAgo.getTime();
-        const uniqueVisitorIds = new Set();
+      if (visitorsError) {
+        console.error('[Unique Visitors] Database error:', visitorsError);
+        throw visitorsError;
+      }
+      
+      if (!allVisitors || allVisitors.length === 0) {
+        console.log('[Unique Visitors] No visitors found in database');
+        uniqueVisitorsCount = 0;
+      } else {
+        // Step 2: Calculate 30 days ago timestamp
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        const cutoffDate = thirtyDaysAgo.toISOString();
+        
+        // Step 3: Count unique visitors who visited in last 30 days
+        const uniqueSet = new Set();
+        let totalVisitors = 0;
+        let recentVisitors = 0;
         
         allVisitors.forEach(visitor => {
-          const lastVisit = visitor.last_visit ? new Date(visitor.last_visit).getTime() : 0;
-          const firstVisit = visitor.first_visit ? new Date(visitor.first_visit).getTime() : 0;
+          totalVisitors++;
           
-          // Include visitor if they visited in last 30 days
-          if (lastVisit >= thirtyDaysAgoTimestamp || firstVisit >= thirtyDaysAgoTimestamp) {
-            // Use visitor_id if available, otherwise use ip_address (matches tracking logic)
-            const identifier = visitor.visitor_id || visitor.ip_address || `visitor_${visitor.id}`;
-            uniqueVisitorIds.add(identifier);
+          // Check if visitor visited in last 30 days
+          const lastVisit = visitor.last_visit || visitor.first_visit;
+          const isRecent = lastVisit && lastVisit >= cutoffDate;
+          
+          if (isRecent) {
+            recentVisitors++;
+            // Each ip_address in visitors table is already unique (enforced by UNIQUE constraint)
+            // So we just count distinct ip_address values
+            if (visitor.ip_address) {
+              uniqueSet.add(visitor.ip_address);
+            }
           }
         });
         
-        uniqueVisitorsCount = uniqueVisitorIds.size;
-        console.log(`[Unique Visitors] Counted ${uniqueVisitorsCount} unique visitors from ${allVisitors.length} visitor records (last 30 days)`);
-      } else if (visitorsError) {
-        console.warn('[Unique Visitors] Error querying visitors table:', visitorsError);
-        // Fallback: count from profile_views
-        const { data: allViewsData, error: viewsError } = await supabase
-          .from('profile_views')
-          .select('ip_address, session_id, viewed_at')
-          .gte('viewed_at', thirtyDaysAgo.toISOString());
+        uniqueVisitorsCount = uniqueSet.size;
         
-        if (!viewsError && allViewsData && allViewsData.length > 0) {
-          const uniqueIds = new Set();
-          allViewsData.forEach(view => {
-            // For localhost, use session_id; for real IPs, use IP
-            if (view.ip_address === '127.0.0.1' || view.ip_address === 'unknown' || !view.ip_address) {
-              if (view.session_id) {
-                uniqueIds.add(view.session_id);
-              }
-            } else if (view.ip_address) {
-              uniqueIds.add(view.ip_address);
-            }
+        // Log detailed information for debugging
+        console.log('[Unique Visitors] Calculation:', {
+          totalVisitorsInDB: totalVisitors,
+          recentVisitors: recentVisitors,
+          uniqueVisitors: uniqueVisitorsCount,
+          cutoffDate: cutoffDate
+        });
+        
+        // If we have visitors but count is 0, show all-time count as fallback
+        if (uniqueVisitorsCount === 0 && totalVisitors > 0) {
+          console.warn('[Unique Visitors] No recent visitors, counting all-time unique visitors');
+          const allTimeUnique = new Set();
+          allVisitors.forEach(v => {
+            if (v.ip_address) allTimeUnique.add(v.ip_address);
           });
-          uniqueVisitorsCount = uniqueIds.size || 1; // At least 1 if we have views
-          console.log(`[Unique Visitors] Fallback: counted ${uniqueVisitorsCount} from profile_views`);
+          uniqueVisitorsCount = allTimeUnique.size;
+          console.log('[Unique Visitors] All-time unique visitors:', uniqueVisitorsCount);
         }
       }
     } catch (err) {
-      console.error('[Unique Visitors] Error calculating:', err);
-      uniqueVisitorsCount = 0;
+      console.error('[Unique Visitors] Error:', err);
+      // Final fallback: try simple count query
+      try {
+        const { count, error } = await supabase
+          .from('visitors')
+          .select('*', { count: 'exact', head: true });
+        
+        if (!error && count !== null) {
+          uniqueVisitorsCount = count;
+          console.log('[Unique Visitors] Fallback count:', uniqueVisitorsCount);
+        }
+      } catch (fallbackErr) {
+        console.error('[Unique Visitors] Fallback also failed:', fallbackErr);
+        uniqueVisitorsCount = 0;
+      }
     }
 
-    // Display totals
-    const totalViewsEl = document.getElementById('total-views');
-    const uniqueVisitorsEl = document.getElementById('unique-visitors');
-    const totalMessagesEl = document.getElementById('total-messages');
+    // Display Actual Data stats
+    const actualUniqueEl = document.getElementById('actual-unique-count');
+    const actualTotalEl = document.getElementById('actual-total-count');
+    const actualMessagesEl = document.getElementById('actual-messages-count');
     
-    if (totalViewsEl) totalViewsEl.textContent = (viewsResult.count || 0).toLocaleString();
-    if (uniqueVisitorsEl) uniqueVisitorsEl.textContent = uniqueVisitorsCount.toLocaleString();
-    if (totalMessagesEl) totalMessagesEl.textContent = (messagesResult.count || 0).toLocaleString();
+    if (actualUniqueEl) {
+      actualUniqueEl.textContent = uniqueVisitorsCount.toLocaleString();
+    }
+    
+    if (actualTotalEl) {
+      actualTotalEl.textContent = (viewsResult.count || 0).toLocaleString();
+    }
+    
+    if (actualMessagesEl) {
+      actualMessagesEl.textContent = (messagesResult.count || 0).toLocaleString();
+    }
       
     // Show success status
     showSuccess('Connected to Supabase database successfully!');
 
-    // Load tables
-    await loadVisitorActivity();
-    await loadRecentViews();
-    await loadMessages();
+    // Load new structured sections
+    await loadUserGivenData();
+    await loadActualData();
 
   } catch (error) {
     console.error('Error loading analytics:', error);
@@ -459,6 +500,569 @@ function toggleVisitorsView() {
       btn.innerHTML = '<i class="bi bi-chevron-up"></i> View Less';
     } else {
       renderVisitorsTable(10);
+      btn.innerHTML = '<i class="bi bi-chevron-down"></i> View More';
+    }
+  }
+}
+
+// Load visitor responses (first visit data)
+async function loadVisitorResponses() {
+  const tbody = document.getElementById('responses-table');
+  if (!tbody) return;
+
+  try {
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      tbody.innerHTML = '<tr><td colspan="5" class="text-center text-danger">❌ Database connection error</td></tr>';
+      return;
+    }
+
+    const { data: responses, error } = await supabase
+      .from('visitor_responses')
+      .select('*')
+      .order('response_time', { ascending: false })
+      .limit(50);
+
+    if (error) {
+      console.error('Error loading visitor responses:', error);
+      tbody.innerHTML = '<tr><td colspan="5" class="text-center text-warning">⚠️ Error loading data</td></tr>';
+      return;
+    }
+
+    if (!responses || responses.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" class="text-center text-info">📭 No visitor responses yet.</td></tr>';
+      return;
+    }
+
+    // Store data globally for toggle view
+    window.allResponsesData = responses;
+
+    // Render table
+    renderResponsesTable(10);
+
+    // Show "View More" button if there are more than 10 responses
+    const viewMoreBtn = document.getElementById('responses-view-more-btn');
+    if (viewMoreBtn && responses.length > 10) {
+      viewMoreBtn.style.display = 'block';
+    }
+
+  } catch (err) {
+    console.error('Error in loadVisitorResponses:', err);
+    tbody.innerHTML = '<tr><td colspan="5" class="text-center text-danger">❌ Error loading responses</td></tr>';
+  }
+}
+
+// Render responses table
+function renderResponsesTable(limit = null) {
+  const tbody = document.getElementById('responses-table');
+  if (!tbody) return;
+  
+  const dataToShow = limit ? window.allResponsesData.slice(0, limit) : window.allResponsesData;
+  
+  if (window.allResponsesData.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-info">📭 No visitor responses yet.</td></tr>';
+    return;
+  }
+
+    tbody.innerHTML = dataToShow.map((response) => {
+      const escapeHtml = (text) => {
+        if (!text) return 'N/A';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+      };
+      
+      const visitorName = response.visitor_name || 'Anonymous';
+      const visitorId = response.visitor_id || 'Unknown';
+      const userSaid = response.user_response ? 'First Time' : 'Returning';
+      const actuallyIs = response.actual_first_visit ? 'First Time' : 'Returning';
+      const matches = response.user_response === response.actual_first_visit;
+      const responseTime = response.response_time ? new Date(response.response_time).toLocaleString() : 'N/A';
+      
+      return `
+        <tr>
+          <td><strong style="color: var(--admin-primary);">${escapeHtml(visitorName)}</strong></td>
+          <td title="${escapeHtml(visitorId)}">${escapeHtml(visitorId.substring(0, 15))}${visitorId.length > 15 ? '...' : ''}</td>
+          <td><span class="badge ${response.user_response ? 'bg-primary' : 'bg-secondary'}">${userSaid}</span></td>
+          <td><span class="badge ${response.actual_first_visit ? 'bg-info' : 'bg-warning'}">${actuallyIs}</span></td>
+          <td><span class="badge ${matches ? 'bg-success' : 'bg-danger'}">${matches ? '✓ Match' : '✗ Mismatch'}</span></td>
+          <td>${responseTime}</td>
+        </tr>
+      `;
+    }).join('');
+}
+
+// Toggle responses view
+function toggleResponsesView() {
+  window.responsesExpanded = !window.responsesExpanded;
+  const btn = document.getElementById('responses-view-more-btn');
+  
+  if (btn) {
+    if (window.responsesExpanded) {
+      renderResponsesTable();
+      btn.innerHTML = '<i class="bi bi-chevron-up"></i> View Less';
+    } else {
+      renderResponsesTable(10);
+      btn.innerHTML = '<i class="bi bi-chevron-down"></i> View More';
+    }
+  }
+}
+
+// ============= NEW STRUCTURED SECTIONS =============
+
+// Load User Given Data Section
+async function loadUserGivenData() {
+  const tbody = document.getElementById('user-given-table');
+  if (!tbody) {
+    console.error('user-given-table element not found');
+    return;
+  }
+
+  try {
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      console.error('Supabase client not available');
+      tbody.innerHTML = '<tr><td colspan="5" class="text-center text-danger">❌ Database connection error</td></tr>';
+      return;
+    }
+
+    console.log('Loading user given data from visitor_responses table...');
+    
+    const { data: responses, error } = await supabase
+      .from('visitor_responses')
+      .select('*')
+      .order('response_time', { ascending: false });
+
+    if (error) {
+      console.error('Error loading user given data:', error);
+      tbody.innerHTML = `<tr><td colspan="5" class="text-center text-warning">⚠️ Error loading data: ${error.message}</td></tr>`;
+      
+      // Set stats to 0 on error
+      const uniqueCountEl = document.getElementById('user-unique-count');
+      const totalCountEl = document.getElementById('user-total-count');
+      const namesCountEl = document.getElementById('user-with-names-count');
+      if (uniqueCountEl) uniqueCountEl.textContent = '0';
+      if (totalCountEl) totalCountEl.textContent = '0';
+      if (namesCountEl) namesCountEl.textContent = '0';
+      return;
+    }
+
+    console.log('User given data loaded:', responses?.length || 0, 'responses');
+
+    if (!responses || responses.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" class="text-center text-info">📭 No user responses yet.</td></tr>';
+      const uniqueCountEl = document.getElementById('user-unique-count');
+      const totalCountEl = document.getElementById('user-total-count');
+      const namesCountEl = document.getElementById('user-with-names-count');
+      if (uniqueCountEl) uniqueCountEl.textContent = '0';
+      if (totalCountEl) totalCountEl.textContent = '0';
+      if (namesCountEl) namesCountEl.textContent = '0';
+      return;
+    }
+
+    // Calculate stats
+    const uniqueVisitors = new Set(responses.map(r => r.visitor_id || r.session_id)).size;
+    const totalResponses = responses.length;
+    const withNames = responses.filter(r => r.visitor_name && r.visitor_name.trim()).length;
+
+    console.log('User given stats:', { uniqueVisitors, totalResponses, withNames });
+
+    // Display stats
+    const uniqueCountEl = document.getElementById('user-unique-count');
+    const totalCountEl = document.getElementById('user-total-count');
+    const namesCountEl = document.getElementById('user-with-names-count');
+    
+    if (uniqueCountEl) uniqueCountEl.textContent = uniqueVisitors.toLocaleString();
+    if (totalCountEl) totalCountEl.textContent = totalResponses.toLocaleString();
+    if (namesCountEl) namesCountEl.textContent = withNames.toLocaleString();
+
+    // Store data globally for toggle view
+    window.allUserGivenData = responses;
+
+    // Render table (limit 10)
+    renderUserGivenTable(10);
+
+    // Show "View More" button if there are more than 10 responses
+    const viewMoreContainer = document.getElementById('user-given-view-more-container');
+    if (viewMoreContainer && responses.length > 10) {
+      viewMoreContainer.style.display = 'block';
+    } else if (viewMoreContainer) {
+      viewMoreContainer.style.display = 'none';
+    }
+
+  } catch (err) {
+    console.error('Error in loadUserGivenData:', err);
+    tbody.innerHTML = `<tr><td colspan="5" class="text-center text-danger">❌ Error: ${err.message || 'Unknown error'}</td></tr>`;
+    
+    // Set stats to 0 on error
+    const uniqueCountEl = document.getElementById('user-unique-count');
+    const totalCountEl = document.getElementById('user-total-count');
+    const namesCountEl = document.getElementById('user-with-names-count');
+    if (uniqueCountEl) uniqueCountEl.textContent = '0';
+    if (totalCountEl) totalCountEl.textContent = '0';
+    if (namesCountEl) namesCountEl.textContent = '0';
+  }
+}
+
+// Render User Given Data Table
+function renderUserGivenTable(limit = null) {
+  const tbody = document.getElementById('user-given-table');
+  if (!tbody || !window.allUserGivenData) return;
+  
+  const dataToShow = limit ? window.allUserGivenData.slice(0, limit) : window.allUserGivenData;
+  
+  if (window.allUserGivenData.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" class="text-center text-info">📭 No user responses yet.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = dataToShow.map((response) => {
+    const escapeHtml = (text) => {
+      if (!text) return 'Anonymous';
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    };
+    
+    const visitorName = response.visitor_name ? escapeHtml(response.visitor_name) : '<span class="text-muted">Anonymous</span>';
+    const visitorId = response.visitor_id || response.session_id || 'Unknown';
+    const userResponse = response.user_response ? 'First Time' : 'Returning';
+    const actualStatus = response.actual_first_visit ? 'First Time' : 'Returning';
+    const responseTime = response.response_time ? new Date(response.response_time).toLocaleString() : 'N/A';
+    
+    return `
+      <tr>
+        <td><strong style="color: var(--admin-primary);">${visitorName}</strong></td>
+        <td title="${escapeHtml(visitorId)}">${escapeHtml(visitorId.substring(0, 15))}${visitorId.length > 15 ? '...' : ''}</td>
+        <td><span class="badge ${response.user_response ? 'bg-primary' : 'bg-secondary'}">${userResponse}</span></td>
+        <td><span class="badge ${response.actual_first_visit ? 'bg-info' : 'bg-warning'}">${actualStatus}</span></td>
+        <td>${responseTime}</td>
+      </tr>
+    `;
+  }).join('');
+}
+
+// Toggle User Given View
+function toggleUserGivenView() {
+  window.userGivenExpanded = !window.userGivenExpanded;
+  const btn = document.getElementById('user-given-view-more-btn');
+  
+  if (btn) {
+    if (window.userGivenExpanded) {
+      renderUserGivenTable();
+      btn.innerHTML = '<i class="bi bi-chevron-up"></i> View Less';
+    } else {
+      renderUserGivenTable(10);
+      btn.innerHTML = '<i class="bi bi-chevron-down"></i> View More';
+    }
+  }
+}
+
+// Load Actual Data Section
+async function loadActualData() {
+  await Promise.all([
+    loadActualVisitors(),
+    loadActualViews(),
+    loadActualMessages()
+  ]);
+}
+
+// Load Actual Visitors
+async function loadActualVisitors() {
+  const tbody = document.getElementById('actual-visitors-table');
+  if (!tbody) return;
+
+  try {
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      tbody.innerHTML = '<tr><td colspan="5" class="text-center text-danger">❌ Database connection error</td></tr>';
+      return;
+    }
+
+    const { data: visitors, error } = await supabase
+      .from('visitors')
+      .select('*')
+      .order('last_visit', { ascending: false })
+      .limit(100);
+
+    if (error) {
+      console.error('Error loading actual visitors:', error);
+      tbody.innerHTML = '<tr><td colspan="5" class="text-center text-warning">⚠️ Error loading data</td></tr>';
+      return;
+    }
+
+    if (!visitors || visitors.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" class="text-center text-info">📭 No visitor data yet.</td></tr>';
+      return;
+    }
+
+    window.allActualVisitors = visitors;
+    renderActualVisitorsTable(10);
+
+    // Update tab label
+    const visitorsTab = document.getElementById('visitors-tab');
+    if (visitorsTab) {
+      const count = visitors.length > 10 ? '10+' : visitors.length.toString();
+      visitorsTab.innerHTML = `<i class="bi bi-people"></i> Visitors (${count})`;
+    }
+
+    const viewMoreContainer = document.getElementById('visitors-view-more-container');
+    if (viewMoreContainer && visitors.length > 10) {
+      viewMoreContainer.style.display = 'block';
+    }
+
+  } catch (err) {
+    console.error('Error in loadActualVisitors:', err);
+    tbody.innerHTML = '<tr><td colspan="5" class="text-center text-danger">❌ Error loading data</td></tr>';
+  }
+}
+
+// Render Actual Visitors Table
+function renderActualVisitorsTable(limit = null) {
+  const tbody = document.getElementById('actual-visitors-table');
+  if (!tbody || !window.allActualVisitors) return;
+  
+  const dataToShow = limit ? window.allActualVisitors.slice(0, limit) : window.allActualVisitors;
+  
+  tbody.innerHTML = dataToShow.map((visitor) => {
+    const escapeHtml = (text) => {
+      if (!text) return 'N/A';
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    };
+    
+    const visitorId = visitor.visitor_id || visitor.ip_address || 'Unknown';
+    const firstVisit = visitor.first_visit ? new Date(visitor.first_visit).toLocaleString() : 'N/A';
+    const lastVisit = visitor.last_visit ? new Date(visitor.last_visit).toLocaleString() : 'N/A';
+    const userAgent = visitor.user_agent || 'Unknown';
+    const shortUserAgent = userAgent.length > 50 ? userAgent.substring(0, 50) + '...' : userAgent;
+    
+    return `
+      <tr>
+        <td>${escapeHtml(visitorId.substring(0, 15))}${visitorId.length > 15 ? '...' : ''}</td>
+        <td>${firstVisit}</td>
+        <td><strong>${lastVisit}</strong></td>
+        <td><span class="badge bg-info">${visitor.visit_count || 1}</span></td>
+        <td title="${escapeHtml(userAgent)}">${escapeHtml(shortUserAgent)}</td>
+      </tr>
+    `;
+  }).join('');
+}
+
+// Toggle Actual Visitors View
+function toggleActualVisitorsView() {
+  window.actualVisitorsExpanded = !window.actualVisitorsExpanded;
+  const btn = document.getElementById('visitors-view-more-btn');
+  
+  if (btn) {
+    if (window.actualVisitorsExpanded) {
+      renderActualVisitorsTable();
+      btn.innerHTML = '<i class="bi bi-chevron-up"></i> View Less';
+    } else {
+      renderActualVisitorsTable(10);
+      btn.innerHTML = '<i class="bi bi-chevron-down"></i> View More';
+    }
+  }
+}
+
+// Load Actual Views
+async function loadActualViews() {
+  const tbody = document.getElementById('actual-views-table');
+  if (!tbody) return;
+
+  try {
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      tbody.innerHTML = '<tr><td colspan="4" class="text-center text-danger">❌ Database connection error</td></tr>';
+      return;
+    }
+
+    const { data: views, error } = await supabase
+      .from('profile_views')
+      .select('*')
+      .order('viewed_at', { ascending: false })
+      .limit(100);
+
+    if (error) {
+      console.error('Error loading actual views:', error);
+      tbody.innerHTML = '<tr><td colspan="4" class="text-center text-warning">⚠️ Error loading data</td></tr>';
+      return;
+    }
+
+    if (!views || views.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="4" class="text-center text-info">📭 No profile views yet.</td></tr>';
+      return;
+    }
+
+    window.allActualViews = views;
+    renderActualViewsTable(10);
+
+    // Update tab label
+    const viewsTab = document.getElementById('views-tab');
+    if (viewsTab) {
+      const count = views.length > 10 ? '10+' : views.length.toString();
+      viewsTab.innerHTML = `<i class="bi bi-eye"></i> Profile Views (${count})`;
+    }
+
+    const viewMoreContainer = document.getElementById('views-view-more-container');
+    if (viewMoreContainer && views.length > 10) {
+      viewMoreContainer.style.display = 'block';
+    }
+
+  } catch (err) {
+    console.error('Error in loadActualViews:', err);
+    tbody.innerHTML = '<tr><td colspan="4" class="text-center text-danger">❌ Error loading data</td></tr>';
+  }
+}
+
+// Render Actual Views Table
+function renderActualViewsTable(limit = null) {
+  const tbody = document.getElementById('actual-views-table');
+  if (!tbody || !window.allActualViews) return;
+  
+  const dataToShow = limit ? window.allActualViews.slice(0, limit) : window.allActualViews;
+  
+  tbody.innerHTML = dataToShow.map((view) => {
+    const escapeHtml = (text) => {
+      if (!text) return 'N/A';
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    };
+    
+    const visitorId = view.visitor_id || view.ip_address || view.session_id || 'Unknown';
+    const viewTime = view.viewed_at ? new Date(view.viewed_at).toLocaleString() : 'N/A';
+    const referrer = view.referrer || 'Direct';
+    const userAgent = view.user_agent || 'Unknown';
+    const shortUserAgent = userAgent.length > 50 ? userAgent.substring(0, 50) + '...' : userAgent;
+    
+    return `
+      <tr>
+        <td>${escapeHtml(visitorId.substring(0, 15))}${visitorId.length > 15 ? '...' : ''}</td>
+        <td>${viewTime}</td>
+        <td>${escapeHtml(referrer)}</td>
+        <td title="${escapeHtml(userAgent)}">${escapeHtml(shortUserAgent)}</td>
+      </tr>
+    `;
+  }).join('');
+}
+
+// Toggle Actual Views View
+function toggleActualViewsView() {
+  window.actualViewsExpanded = !window.actualViewsExpanded;
+  const btn = document.getElementById('views-view-more-btn');
+  
+  if (btn) {
+    if (window.actualViewsExpanded) {
+      renderActualViewsTable();
+      btn.innerHTML = '<i class="bi bi-chevron-up"></i> View Less';
+    } else {
+      renderActualViewsTable(10);
+      btn.innerHTML = '<i class="bi bi-chevron-down"></i> View More';
+    }
+  }
+}
+
+// Load Actual Messages
+async function loadActualMessages() {
+  const tbody = document.getElementById('actual-messages-table');
+  if (!tbody) return;
+
+  try {
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      tbody.innerHTML = '<tr><td colspan="8" class="text-center text-danger">❌ Database connection error</td></tr>';
+      return;
+    }
+
+    const { data: messages, error } = await supabase
+      .from('messages')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(100);
+
+    if (error) {
+      console.error('Error loading actual messages:', error);
+      tbody.innerHTML = '<tr><td colspan="8" class="text-center text-warning">⚠️ Error loading data</td></tr>';
+      return;
+    }
+
+    if (!messages || messages.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="8" class="text-center text-info">📭 No messages yet.</td></tr>';
+      return;
+    }
+
+    window.allActualMessages = messages;
+    renderActualMessagesTable(10);
+
+    // Update tab label
+    const messagesTab = document.getElementById('messages-tab');
+    if (messagesTab) {
+      const count = messages.length > 10 ? '10+' : messages.length.toString();
+      messagesTab.innerHTML = `<i class="bi bi-envelope"></i> Messages (${count})`;
+    }
+
+    const viewMoreContainer = document.getElementById('messages-view-more-container');
+    if (viewMoreContainer && messages.length > 10) {
+      viewMoreContainer.style.display = 'block';
+    }
+
+  } catch (err) {
+    console.error('Error in loadActualMessages:', err);
+    tbody.innerHTML = '<tr><td colspan="8" class="text-center text-danger">❌ Error loading data</td></tr>';
+  }
+}
+
+// Render Actual Messages Table
+function renderActualMessagesTable(limit = null) {
+  const tbody = document.getElementById('actual-messages-table');
+  if (!tbody || !window.allActualMessages) return;
+  
+  const dataToShow = limit ? window.allActualMessages.slice(0, limit) : window.allActualMessages;
+  
+  tbody.innerHTML = dataToShow.map((message) => {
+    const escapeHtml = (text) => {
+      if (!text) return 'N/A';
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    };
+    
+    const messagePreview = message.message ? (message.message.length > 50 ? message.message.substring(0, 50) + '...' : message.message) : 'N/A';
+    const date = message.created_at ? new Date(message.created_at).toLocaleString() : 'N/A';
+    const isRead = message.read || false;
+    
+    return `
+      <tr>
+        <td>${message.id || 'N/A'}</td>
+        <td>${escapeHtml(message.name || 'Anonymous')}</td>
+        <td>${escapeHtml(message.email || 'N/A')}</td>
+        <td>${escapeHtml(message.subject || 'No Subject')}</td>
+        <td title="${escapeHtml(message.message || '')}">${escapeHtml(messagePreview)}</td>
+        <td>${date}</td>
+        <td><span class="badge ${isRead ? 'bg-success' : 'bg-warning'}">${isRead ? 'Read' : 'Unread'}</span></td>
+        <td>
+          <button class="btn btn-sm btn-outline-light" onclick="markMessageRead(${message.id})">
+            <i class="bi bi-check"></i>
+          </button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+// Toggle Actual Messages View
+function toggleActualMessagesView() {
+  window.actualMessagesExpanded = !window.actualMessagesExpanded;
+  const btn = document.getElementById('messages-view-more-btn');
+  
+  if (btn) {
+    if (window.actualMessagesExpanded) {
+      renderActualMessagesTable();
+      btn.innerHTML = '<i class="bi bi-chevron-up"></i> View Less';
+    } else {
+      renderActualMessagesTable(10);
       btn.innerHTML = '<i class="bi bi-chevron-down"></i> View More';
     }
   }

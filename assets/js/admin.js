@@ -662,13 +662,16 @@ async function loadUserGivenData() {
 
     console.log('User given data loaded:', responses?.length || 0, 'responses');
     
-    // If no data, check if table exists
+    // If no data, provide helpful diagnostics
     if (!responses || responses.length === 0) {
-      console.warn('⚠️ No responses found. Possible reasons:');
-      console.warn('1. Table "visitor_responses" might not exist - run visitor-responses-schema.sql in Supabase');
-      console.warn('2. RLS policies might be blocking access - check Supabase policies');
-      console.warn('3. No users have submitted the first-visit modal yet');
-      console.warn('4. Check browser console when submitting the modal for insert errors');
+      console.warn('⚠️ No responses found.');
+      console.warn('This is normal if:');
+      console.warn('  1. No users have submitted the first-visit modal yet');
+      console.warn('  2. You need to clear localStorage and test: localStorage.removeItem("first_visit_response")');
+      console.warn('');
+      console.warn('If the table is missing, run: COMPLETE_FIX_AND_TEST.sql in Supabase SQL Editor');
+    } else {
+      console.log('✅ Successfully loaded', responses.length, 'visitor responses!');
     }
 
     if (!responses || responses.length === 0) {

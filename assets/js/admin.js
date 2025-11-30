@@ -1716,45 +1716,55 @@ async function loadOnlineUsers() {
   try {
     // Get last 5 minutes timestamp for truly active users
     const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
-    // Get last 30 minutes for recent activity check
-    const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
     
-    // Query recent profile views (active users)
+    // Query visitors table for recent activity (most accurate)
+    const { data: recentVisitors, error: visitorsError } = await supabase
+      .from('visitors')
+      .select('ip_address, last_visit, user_agent, visit_count')
+      .gte('last_visit', fiveMinutesAgo)
+      .order('last_visit', { ascending: false });
+
+    if (visitorsError) {
+      console.warn('Error loading visitors:', visitorsError);
+    }
+
+    // Also get the most recent profile view for each visitor to get current page info
     const { data: recentViews, error: viewsError } = await supabase
       .from('profile_views')
-      .select('ip_address, viewed_at, referrer, user_agent, session_id')
-      .gte('viewed_at', thirtyMinutesAgo)
-      .order('viewed_at', { ascending: false })
-      .limit(100); // Limit to prevent huge queries
+      .select('ip_address, viewed_at, referrer, user_agent')
+      .gte('viewed_at', fiveMinutesAgo)
+      .order('viewed_at', { ascending: false });
 
     if (viewsError) {
       console.warn('Error loading profile views:', viewsError);
     }
 
-    // Also check recent visitor responses for activity
-    const { data: recentResponses, error: responsesError } = await supabase
+    // Get visitor names from visitor_responses
+    const { data: visitorResponses, error: responsesError } = await supabase
       .from('visitor_responses')
-      .select('visitor_id, ip_address, visitor_name, response_time, user_response')
-      .gte('response_time', thirtyMinutesAgo)
-      .order('response_time', { ascending: false })
-      .limit(100);
+      .select('visitor_id, ip_address, visitor_name')
+      .not('visitor_name', 'is', null);
 
     if (responsesError) {
       console.warn('Error loading visitor responses:', responsesError);
     }
 
-    // Group by IP/visitor_id to get unique active users
-    const uniqueUsers = new Map();
-    
-    // Process profile views
+    // Create a map of visitor names by IP/visitor_id
+    const nameMap = new Map();
+    visitorResponses?.forEach(response => {
+      const key = response.visitor_id || response.ip_address;
+      if (key && response.visitor_name) {
+        nameMap.set(key, response.visitor_name);
+      }
+    });
+
+    // Create a map of recent views by IP for current page info
+    const viewsMap = new Map();
     recentViews?.forEach(view => {
-      const ip = view.ip_address || 'unknown';
-      if (ip === 'unknown') return;
+      const ip = view.ip_address;
+      if (!ip || ip === 'unknown') return;
       
-      const activityTime = new Date(view.viewed_at);
-      const isActive = activityTime >= new Date(fiveMinutesAgo);
-      
-      if (!uniqueUsers.has(ip)) {
+      if (!viewsMap.has(ip)) {
         let currentPage = '/';
         try {
           if (view.referrer && view.referrer !== 'direct' && view.referrer !== 'Direct') {
@@ -1762,102 +1772,71 @@ async function loadOnlineUsers() {
             currentPage = url.pathname || '/';
           }
         } catch (e) {
-          // If URL parsing fails, just use '/'
           currentPage = '/';
         }
         
-        uniqueUsers.set(ip, {
-          ip_address: ip,
-          visitor_id: ip,
-          last_activity: view.viewed_at,
+        viewsMap.set(ip, {
           current_page: currentPage,
           user_agent: view.user_agent || 'Unknown',
-          is_active: isActive,
-          session_id: view.session_id
-        });
-      } else {
-        // Update if this is more recent
-        const existing = uniqueUsers.get(ip);
-        const existingTime = new Date(existing.last_activity);
-        if (activityTime > existingTime) {
-          existing.last_activity = view.viewed_at;
-          try {
-            if (view.referrer && view.referrer !== 'direct' && view.referrer !== 'Direct') {
-              const url = new URL(view.referrer);
-              existing.current_page = url.pathname || existing.current_page;
-            }
-          } catch (e) {
-            // Keep existing page if URL parsing fails
-          }
-          existing.is_active = isActive;
-        }
-      }
-    });
-
-    // Process visitor responses to add names and check activity
-    recentResponses?.forEach(response => {
-      const visitorId = response.visitor_id || response.ip_address;
-      if (!visitorId || visitorId === 'unknown') return;
-      
-      const activityTime = new Date(response.response_time);
-      const isActive = activityTime >= new Date(fiveMinutesAgo);
-      
-      // Try to match by visitor_id or ip_address
-      let matchedUser = null;
-      for (const [key, user] of uniqueUsers.entries()) {
-        if (key === visitorId || key === response.ip_address || user.visitor_id === visitorId) {
-          matchedUser = user;
-          break;
-        }
-      }
-      
-      if (matchedUser) {
-        // Update name if available
-        if (response.visitor_name && !matchedUser.name) {
-          matchedUser.name = response.visitor_name;
-        }
-        // Update activity if more recent
-        const matchedTime = new Date(matchedUser.last_activity);
-        if (activityTime > matchedTime) {
-          matchedUser.last_activity = response.response_time;
-          matchedUser.is_active = isActive;
-        }
-      } else {
-        // New user from response
-        uniqueUsers.set(visitorId, {
-          ip_address: response.ip_address || visitorId,
-          visitor_id: visitorId,
-          last_activity: response.response_time,
-          current_page: '/',
-          user_agent: 'Unknown',
-          is_active: isActive,
-          name: response.visitor_name || null
+          viewed_at: view.viewed_at
         });
       }
     });
 
-    // Filter to only show truly active users (last 5 minutes)
-    const onlineUsersArray = Array.from(uniqueUsers.values())
-      .filter(user => user.is_active)
-      .sort((a, b) => new Date(b.last_activity) - new Date(a.last_activity));
+    // Build online users array from visitors table
+    const onlineUsersArray = [];
+    recentVisitors?.forEach(visitor => {
+      const ip = visitor.ip_address;
+      if (!ip || ip === 'unknown') return;
+      
+      const viewInfo = viewsMap.get(ip);
+      const visitorName = nameMap.get(ip) || nameMap.get(visitor.ip_address);
+      
+      onlineUsersArray.push({
+        ip_address: ip,
+        visitor_id: ip,
+        name: visitorName || null,
+        last_activity: visitor.last_visit,
+        current_page: viewInfo?.current_page || '/',
+        user_agent: viewInfo?.user_agent || visitor.user_agent || 'Unknown',
+        visit_count: visitor.visit_count || 1,
+        is_active: true
+      });
+    });
 
-    // Set names for users without names
+    // Set names for users without names and ensure all fields are set
     onlineUsersArray.forEach(user => {
       if (!user.name) {
         user.name = 'Anonymous';
       }
-    })
+      if (!user.current_page) {
+        user.current_page = '/';
+      }
+      if (!user.user_agent) {
+        user.user_agent = 'Unknown';
+      }
+    });
+    
+    // Sort by last activity (most recent first)
+    onlineUsersArray.sort((a, b) => new Date(b.last_activity) - new Date(a.last_activity));
 
     // Store globally
     window.allOnlineUsers = onlineUsersArray;
 
-    console.log('Online users:', onlineUsersArray.length, onlineUsersArray);
+    console.log('✅ Online users loaded:', {
+      count: onlineUsersArray.length,
+      users: onlineUsersArray.map(u => ({
+        ip: u.ip_address.substring(0, 15),
+        name: u.name,
+        lastActivity: u.last_activity
+      }))
+    });
 
     // Render table
     renderOnlineUsersTable();
 
   } catch (err) {
-    console.error('Error loading online users:', err);
+    console.error('❌ Error loading online users:', err);
     tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger">Error loading online users: ' + (err.message || 'Unknown error') + '</td></tr>';
   }
 }

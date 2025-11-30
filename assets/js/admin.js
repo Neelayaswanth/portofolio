@@ -1756,17 +1756,23 @@ async function loadOnlineUsers() {
       }
     });
 
-    // Group by IP address - show all unique users viewing the site
-    // One entry per IP (each IP = one user/viewer)
+    // Group by unique identifier - use session_id + IP combination for better uniqueness
+    // This shows ALL unique active users/viewers
     const uniqueUsers = new Map();
     
     recentViews.forEach(view => {
       const ip = view.ip_address;
       if (!ip || ip === 'unknown') return;
       
-      // If this IP already exists, update it only if this view is more recent
-      if (uniqueUsers.has(ip)) {
-        const existing = uniqueUsers.get(ip);
+      // Create unique key: IP + session_id (or IP + timestamp if no session_id)
+      // This ensures we capture all unique users, even if they share an IP
+      const uniqueKey = view.session_id 
+        ? `${ip}_${view.session_id}` 
+        : `${ip}_${new Date(view.viewed_at).getTime()}`;
+      
+      // If this user/session already exists, update it only if this view is more recent
+      if (uniqueUsers.has(uniqueKey)) {
+        const existing = uniqueUsers.get(uniqueKey);
         const existingTime = new Date(existing.last_activity);
         const currentTime = new Date(view.viewed_at);
         
@@ -1788,7 +1794,7 @@ async function loadOnlineUsers() {
           }
         }
       } else {
-        // New viewer - add to list
+        // New viewer - add to list (this ensures ALL users are added)
         let currentPage = '/';
         try {
           if (view.referrer && view.referrer !== 'direct' && view.referrer !== 'Direct') {
@@ -1799,9 +1805,9 @@ async function loadOnlineUsers() {
           currentPage = '/';
         }
         
-        const visitorName = nameMap.get(ip) || nameMap.get(view.session_id);
+        const visitorName = nameMap.get(ip) || nameMap.get(view.session_id) || nameMap.get(view.ip_address);
         
-        uniqueUsers.set(ip, {
+        uniqueUsers.set(uniqueKey, {
           ip_address: ip,
           visitor_id: ip,
           session_id: view.session_id || 'No Session',
@@ -1809,9 +1815,16 @@ async function loadOnlineUsers() {
           last_activity: view.viewed_at,
           current_page: currentPage,
           user_agent: view.user_agent || 'Unknown',
-          is_active: true
+          is_active: true,
+          unique_key: uniqueKey // Store for debugging
         });
       }
+    });
+    
+    console.log('🔍 Processing views:', {
+      totalViews: recentViews.length,
+      uniqueKeysCreated: uniqueUsers.size,
+      uniqueIPs: new Set(recentViews.map(v => v.ip_address).filter(ip => ip && ip !== 'unknown')).size
     });
 
     // Convert to array and filter out offline users immediately

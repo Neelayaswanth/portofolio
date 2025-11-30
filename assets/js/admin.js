@@ -1845,13 +1845,21 @@ async function loadOnlineUsers() {
     window.allOnlineUsers = onlineUsersArray;
 
     console.log('✅ Online users loaded:', {
-      count: onlineUsersArray.length,
+      totalViews: recentViews?.length || 0,
+      uniqueOnlineUsers: onlineUsersArray.length,
       users: onlineUsersArray.map(u => ({
-        ip: u.ip_address.substring(0, 15),
-        name: u.name,
-        lastActivity: u.last_activity
+        ip: u.ip_address?.substring(0, 15) || 'unknown',
+        name: u.name || 'Anonymous',
+        lastActivity: u.last_activity,
+        isActive: u.is_active
       }))
     });
+    
+    // Debug: Log unique IPs found
+    if (recentViews && recentViews.length > 0) {
+      const uniqueIPs = new Set(recentViews.map(v => v.ip_address).filter(ip => ip && ip !== 'unknown'));
+      console.log('🔍 Debug - Unique IPs found:', uniqueIPs.size, 'Online users shown:', onlineUsersArray.length);
+    }
 
     // Render table
     renderOnlineUsersTable();

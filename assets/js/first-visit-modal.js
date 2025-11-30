@@ -297,3 +297,32 @@
   console.log('✅ First visit modal script loaded');
   console.log('💡 To manually test: Run "localStorage.removeItem(\'first_visit_response\'); window.showFirstVisitModal();" in console');
 })();
+
+// Force cleanup function to ensure page is scrollable (global)
+function forceCleanupModal() {
+  // Remove all modal backdrops
+  const backdrops = document.querySelectorAll('.modal-backdrop');
+  backdrops.forEach(b => {
+    b.remove();
+  });
+  
+  // Remove modal-open class
+  document.body.classList.remove('modal-open');
+  
+  // Restore body styles
+  document.body.style.overflow = '';
+  document.body.style.paddingRight = '';
+  
+  // Ensure modal is hidden
+  const modalEl = document.getElementById('firstVisitModal');
+  if (modalEl) {
+    modalEl.classList.remove('show');
+    modalEl.style.display = 'none';
+    modalEl.setAttribute('aria-hidden', 'true');
+  }
+  
+  console.log('✅ Modal cleanup completed - page should be scrollable now');
+}
+
+// Make it globally accessible
+window.forceCleanupModal = forceCleanupModal;

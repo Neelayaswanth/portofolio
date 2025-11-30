@@ -239,6 +239,13 @@
         'success'
       );
     }
+    
+    // Final cleanup - ensure page is scrollable (fallback after 500ms)
+    setTimeout(() => {
+      if (typeof forceCleanupModal === 'function') {
+        forceCleanupModal();
+      }
+    }, 500);
   }
 
   // Global trigger

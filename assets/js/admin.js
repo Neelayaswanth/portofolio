@@ -1830,6 +1830,7 @@ async function loadOnlineUsers() {
       totalViews: recentViews.length,
       uniqueUsersFound: uniqueUsers.size,
       uniqueIPs: new Set(recentViews.map(v => v.ip_address).filter(ip => ip && ip !== 'unknown')).size,
+      uniqueSessionIDs: new Set(recentViews.map(v => v.session_id).filter(s => s)).size,
       sampleIPs: Array.from(new Set(recentViews.map(v => v.ip_address).filter(ip => ip && ip !== 'unknown'))).slice(0, 5)
     });
 

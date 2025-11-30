@@ -1,0 +1,832 @@
+/**
+ * Admin Dashboard JavaScript
+ * Handles authentication, analytics loading, and dashboard functionality
+ */
+
+// Authentication credentials
+const ADMIN_CREDENTIALS = {
+  username: 'yash',
+  password: '1797365'
+};
+
+// Store full data for view more functionality
+window.allVisitorsData = [];
+window.allViewsData = [];
+window.allMessagesData = [];
+window.messagesData = [];
+window.visitorsExpanded = false;
+window.viewsExpanded = false;
+window.messagesExpanded = false;
+
+// Check if user is authenticated
+function checkAuthentication() {
+  const isAuthenticated = sessionStorage.getItem('adminAuthenticated') === 'true';
+  if (isAuthenticated) {
+    showDashboard();
+  } else {
+    showLogin();
+  }
+}
+
+// Show login form
+function showLogin() {
+  document.getElementById('login-container').style.display = 'flex';
+  document.getElementById('dashboard-container').style.display = 'none';
+  const usernameInput = document.getElementById('username');
+  if (usernameInput) {
+    usernameInput.focus();
+  }
+}
+
+// Show dashboard
+function showDashboard() {
+  document.getElementById('login-container').style.display = 'none';
+  document.getElementById('dashboard-container').style.display = 'block';
+  
+  // Display admin login times
+  updateAdminLoginTimes();
+  
+  // Load analytics when dashboard is shown
+  setTimeout(loadAnalytics, 500);
+}
+
+// Update admin login times display
+function updateAdminLoginTimes() {
+  const currentLoginTime = sessionStorage.getItem('adminLoginTime');
+  let currentLoginTimestamp = 0;
+  
+  if (currentLoginTime) {
+    currentLoginTimestamp = parseInt(currentLoginTime);
+    const currentLoginDate = new Date(currentLoginTimestamp);
+    const currentTimeEl = document.getElementById('current-login-time');
+    if (currentTimeEl) {
+      currentTimeEl.textContent = currentLoginDate.toLocaleString();
+    }
+  } else {
+    const currentTimeEl = document.getElementById('current-login-time');
+    if (currentTimeEl) {
+      currentTimeEl.textContent = 'Just now';
+    }
+  }
+  
+  // Get last login time from localStorage
+  const lastLoginISO = localStorage.getItem('adminLastLogin');
+  
+  if (lastLoginISO) {
+    const lastLoginDate = new Date(lastLoginISO);
+    const lastLoginTimestamp = lastLoginDate.getTime();
+    const timeDifference = Math.abs(lastLoginTimestamp - currentLoginTimestamp);
+    
+    if (timeDifference > 2000) {
+      const lastTimeEl = document.getElementById('last-login-time');
+      if (lastTimeEl) {
+        lastTimeEl.textContent = lastLoginDate.toLocaleString();
+      }
+      return;
+    }
+  }
+  
+  // Check history
+  const loginHistory = JSON.parse(localStorage.getItem('adminLoginHistory') || '[]');
+  if (loginHistory.length > 1) {
+    for (let i = 1; i < loginHistory.length; i++) {
+      const histEntry = loginHistory[i];
+      if (histEntry.timestamp_ms) {
+        const histTime = parseInt(histEntry.timestamp_ms);
+        if (Math.abs(histTime - currentLoginTimestamp) > 2000) {
+          const histDate = new Date(histTime);
+          const lastTimeEl = document.getElementById('last-login-time');
+          if (lastTimeEl) {
+            lastTimeEl.textContent = histDate.toLocaleString();
+          }
+          return;
+        }
+      }
+    }
+  }
+  
+  const lastTimeEl = document.getElementById('last-login-time');
+  if (lastTimeEl) {
+    lastTimeEl.textContent = 'First login';
+  }
+}
+
+// Handle login form submission
+function setupLoginForm() {
+  const loginForm = document.getElementById('login-form');
+  if (!loginForm) return;
+  
+  loginForm.addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const username = document.getElementById('username')?.value.trim();
+    const password = document.getElementById('password')?.value;
+    const errorDiv = document.getElementById('login-error');
+    
+    if (!errorDiv) return;
+    
+    // Clear previous error
+    errorDiv.style.display = 'none';
+    errorDiv.textContent = '';
+    
+    // Validate credentials
+    if (username === ADMIN_CREDENTIALS.username && password === ADMIN_CREDENTIALS.password) {
+      const previousLoginTimestamp = localStorage.getItem('adminLastLoginTimestamp');
+      const newLoginTimestamp = Date.now();
+      const newLoginTimeISO = new Date().toISOString();
+      
+      // Set authentication
+      sessionStorage.setItem('adminAuthenticated', 'true');
+      sessionStorage.setItem('adminLoginTime', newLoginTimestamp.toString());
+      
+      // Update last login information
+      if (previousLoginTimestamp) {
+        const previousLoginDate = new Date(parseInt(previousLoginTimestamp));
+        localStorage.setItem('adminLastLogin', previousLoginDate.toISOString());
+      } else {
+        localStorage.removeItem('adminLastLogin');
+      }
+      
+      // Save new login timestamp
+      localStorage.setItem('adminLastLoginTimestamp', newLoginTimestamp.toString());
+      
+      // Save to login history
+      const loginHistory = JSON.parse(localStorage.getItem('adminLoginHistory') || '[]');
+      loginHistory.unshift({ 
+        timestamp: newLoginTimeISO, 
+        date: new Date(newLoginTimeISO).toLocaleString(),
+        timestamp_ms: newLoginTimestamp
+      });
+      localStorage.setItem('adminLoginHistory', JSON.stringify(loginHistory.slice(0, 10)));
+      
+      // Show dashboard
+      showDashboard();
+    } else {
+      // Show error
+      errorDiv.textContent = 'Invalid username or password. Please try again.';
+      errorDiv.style.display = 'block';
+      
+      // Clear password field
+      const passwordInput = document.getElementById('password');
+      if (passwordInput) {
+        passwordInput.value = '';
+        passwordInput.focus();
+      }
+    }
+  });
+}
+
+// Logout function
+function logout() {
+  if (confirm('Are you sure you want to logout?')) {
+    sessionStorage.removeItem('adminAuthenticated');
+    sessionStorage.removeItem('adminLoginTime');
+    showLogin();
+    
+    // Clear form
+    const loginForm = document.getElementById('login-form');
+    if (loginForm) {
+      loginForm.reset();
+    }
+    const errorDiv = document.getElementById('login-error');
+    if (errorDiv) {
+      errorDiv.style.display = 'none';
+    }
+  }
+}
+
+// Get Supabase client
+function getSupabaseClient() {
+  if (window.SupabaseConfig && window.SupabaseConfig.client) {
+    return window.SupabaseConfig.client();
+  }
+  return null;
+}
+
+// Check database connection
+async function checkDatabaseConnection() {
+  const supabase = getSupabaseClient();
+  if (!supabase) {
+    return false;
+  }
+
+  try {
+    const { error } = await supabase.from('messages').select('id').limit(1);
+    return !error;
+  } catch (error) {
+    return false;
+  }
+}
+
+// Load analytics
+async function loadAnalytics() {
+  // Check authentication
+  if (sessionStorage.getItem('adminAuthenticated') !== 'true') {
+    showLogin();
+    return;
+  }
+
+  const refreshBtn = document.getElementById('refresh-btn');
+  if (refreshBtn) {
+    refreshBtn.disabled = true;
+    refreshBtn.innerHTML = '<span class="loading-spinner"></span> Loading...';
+  }
+
+  const supabase = getSupabaseClient();
+  
+  if (!supabase) {
+    showError('Supabase client not initialized. Please check your configuration.');
+    return;
+  }
+
+  // Check connection
+  const isConnected = await checkDatabaseConnection();
+  if (!isConnected) {
+    showError('Cannot connect to database. Please check your Supabase configuration.');
+    return;
+  }
+
+  try {
+    // Load analytics data
+    const [viewsResult, messagesResult] = await Promise.all([
+      supabase.from('profile_views').select('*', { count: 'exact', head: true }),
+      supabase.from('messages').select('*', { count: 'exact', head: true })
+    ]);
+
+    if (viewsResult.error) throw viewsResult.error;
+    if (messagesResult.error) throw messagesResult.error;
+
+    // Calculate unique visitors - use visitors table (most accurate)
+    let uniqueVisitorsCount = 0;
+    try {
+      // Count distinct visitors from visitors table (last 30 days)
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      
+      const { data: allVisitors, error: visitorsError } = await supabase
+        .from('visitors')
+        .select('id, visitor_id, ip_address, last_visit, first_visit');
+      
+      if (!visitorsError && allVisitors && allVisitors.length > 0) {
+        const thirtyDaysAgoTimestamp = thirtyDaysAgo.getTime();
+        const uniqueVisitorIds = new Set();
+        
+        allVisitors.forEach(visitor => {
+          const lastVisit = visitor.last_visit ? new Date(visitor.last_visit).getTime() : 0;
+          const firstVisit = visitor.first_visit ? new Date(visitor.first_visit).getTime() : 0;
+          
+          // Include visitor if they visited in last 30 days
+          if (lastVisit >= thirtyDaysAgoTimestamp || firstVisit >= thirtyDaysAgoTimestamp) {
+            // Use visitor_id if available, otherwise use ip_address (matches tracking logic)
+            const identifier = visitor.visitor_id || visitor.ip_address || `visitor_${visitor.id}`;
+            uniqueVisitorIds.add(identifier);
+          }
+        });
+        
+        uniqueVisitorsCount = uniqueVisitorIds.size;
+        console.log(`[Unique Visitors] Counted ${uniqueVisitorsCount} unique visitors from ${allVisitors.length} visitor records (last 30 days)`);
+      } else if (visitorsError) {
+        console.warn('[Unique Visitors] Error querying visitors table:', visitorsError);
+        // Fallback: count from profile_views
+        const { data: allViewsData, error: viewsError } = await supabase
+          .from('profile_views')
+          .select('ip_address, session_id, viewed_at')
+          .gte('viewed_at', thirtyDaysAgo.toISOString());
+        
+        if (!viewsError && allViewsData && allViewsData.length > 0) {
+          const uniqueIds = new Set();
+          allViewsData.forEach(view => {
+            // For localhost, use session_id; for real IPs, use IP
+            if (view.ip_address === '127.0.0.1' || view.ip_address === 'unknown' || !view.ip_address) {
+              if (view.session_id) {
+                uniqueIds.add(view.session_id);
+              }
+            } else if (view.ip_address) {
+              uniqueIds.add(view.ip_address);
+            }
+          });
+          uniqueVisitorsCount = uniqueIds.size || 1; // At least 1 if we have views
+          console.log(`[Unique Visitors] Fallback: counted ${uniqueVisitorsCount} from profile_views`);
+        }
+      }
+    } catch (err) {
+      console.error('[Unique Visitors] Error calculating:', err);
+      uniqueVisitorsCount = 0;
+    }
+
+    // Display totals
+    const totalViewsEl = document.getElementById('total-views');
+    const uniqueVisitorsEl = document.getElementById('unique-visitors');
+    const totalMessagesEl = document.getElementById('total-messages');
+    
+    if (totalViewsEl) totalViewsEl.textContent = (viewsResult.count || 0).toLocaleString();
+    if (uniqueVisitorsEl) uniqueVisitorsEl.textContent = uniqueVisitorsCount.toLocaleString();
+    if (totalMessagesEl) totalMessagesEl.textContent = (messagesResult.count || 0).toLocaleString();
+      
+    // Show success status
+    showSuccess('Connected to Supabase database successfully!');
+
+    // Load tables
+    await loadVisitorActivity();
+    await loadRecentViews();
+    await loadMessages();
+
+  } catch (error) {
+    console.error('Error loading analytics:', error);
+    showError(`Error: ${error.message}`);
+  } finally {
+    if (refreshBtn) {
+      refreshBtn.disabled = false;
+      refreshBtn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Refresh';
+    }
+  }
+}
+
+// Show error message
+function showError(message) {
+  const statusDiv = document.getElementById('connection-status');
+  if (statusDiv) {
+    statusDiv.className = 'alert alert-danger connection-status';
+    statusDiv.style.display = 'block';
+    const statusMessage = document.getElementById('status-message');
+    if (statusMessage) {
+      statusMessage.textContent = '❌ ' + message;
+    }
+  }
+  
+  // Don't overwrite stats with "Error" - they might have valid cached data
+  // Only show error in status message
+}
+
+// Show success message
+function showSuccess(message) {
+  const statusDiv = document.getElementById('connection-status');
+  if (statusDiv) {
+    statusDiv.className = 'alert alert-success connection-status';
+    statusDiv.style.display = 'block';
+    const statusMessage = document.getElementById('status-message');
+    if (statusMessage) {
+      statusMessage.textContent = '✅ ' + message;
+    }
+  }
+}
+
+// Load visitor activity
+async function loadVisitorActivity() {
+  const tbody = document.getElementById('visitors-table');
+  const supabase = getSupabaseClient();
+  
+  if (!tbody || !supabase) {
+    return;
+  }
+
+  try {
+    const { data: visitorsData, error: visitorsError } = await supabase
+      .from('visitors')
+      .select('*')
+      .order('last_visit', { ascending: false })
+      .limit(100);
+
+    if (visitorsError) {
+      throw visitorsError;
+    }
+
+    window.allVisitorsData = visitorsData || [];
+
+    if (!visitorsData || visitorsData.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" class="text-center text-info">📭 No visitor data yet.</td></tr>';
+      const btn = document.getElementById('visitors-view-more-btn');
+      if (btn) btn.style.display = 'none';
+    } else {
+      renderVisitorsTable(10);
+      const btn = document.getElementById('visitors-view-more-btn');
+      if (btn && visitorsData.length > 10) {
+        btn.style.display = 'block';
+      }
+    }
+  } catch (error) {
+    console.error('Error loading visitor activity:', error);
+    tbody.innerHTML = `<tr><td colspan="5" class="text-center text-danger">⚠️ Error: ${error.message}</td></tr>`;
+  }
+}
+
+// Render visitors table
+function renderVisitorsTable(limit = null) {
+  const tbody = document.getElementById('visitors-table');
+  if (!tbody) return;
+  
+  const dataToShow = limit ? window.allVisitorsData.slice(0, limit) : window.allVisitorsData;
+  
+  if (window.allVisitorsData.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" class="text-center text-info">📭 No visitor data yet.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = dataToShow.map((visitor) => {
+    const escapeHtml = (text) => {
+      if (!text) return 'N/A';
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    };
+    
+    const visitorId = visitor.visitor_id || visitor.ip_address || 'Unknown';
+    const userAgent = visitor.user_agent || 'Unknown';
+    const shortUserAgent = userAgent.length > 50 ? userAgent.substring(0, 50) + '...' : userAgent;
+    const firstVisit = visitor.first_visit ? new Date(visitor.first_visit).toLocaleString() : 'N/A';
+    const lastVisit = visitor.last_visit ? new Date(visitor.last_visit).toLocaleString() : 'N/A';
+    
+    return `
+      <tr>
+        <td>${escapeHtml(visitorId.substring(0, 8) + '...')}</td>
+        <td>${firstVisit}</td>
+        <td><strong>${lastVisit}</strong></td>
+        <td><span class="badge bg-info">${visitor.visit_count || 1}</span></td>
+        <td title="${escapeHtml(userAgent)}">${escapeHtml(shortUserAgent)}</td>
+      </tr>
+    `;
+  }).join('');
+}
+
+// Toggle visitors view
+function toggleVisitorsView() {
+  window.visitorsExpanded = !window.visitorsExpanded;
+  const btn = document.getElementById('visitors-view-more-btn');
+  
+  if (btn) {
+    if (window.visitorsExpanded) {
+      renderVisitorsTable();
+      btn.innerHTML = '<i class="bi bi-chevron-up"></i> View Less';
+    } else {
+      renderVisitorsTable(10);
+      btn.innerHTML = '<i class="bi bi-chevron-down"></i> View More';
+    }
+  }
+}
+
+// Load recent profile views
+async function loadRecentViews() {
+  const tbody = document.getElementById('views-table');
+  const supabase = getSupabaseClient();
+  
+  if (!tbody || !supabase) {
+    return;
+  }
+
+  try {
+    const { data: viewsData, error: viewsError } = await supabase
+      .from('profile_views')
+      .select('*')
+      .order('viewed_at', { ascending: false })
+      .limit(100);
+
+    if (viewsError) {
+      throw viewsError;
+    }
+
+    window.allViewsData = viewsData || [];
+
+    if (!viewsData || viewsData.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="4" class="text-center text-info">📭 No view data yet.</td></tr>';
+      const btn = document.getElementById('views-view-more-btn');
+      if (btn) btn.style.display = 'none';
+    } else {
+      renderViewsTable(10);
+      const btn = document.getElementById('views-view-more-btn');
+      if (btn && viewsData.length > 10) {
+        btn.style.display = 'block';
+      }
+    }
+  } catch (error) {
+    console.error('Error loading recent views:', error);
+    tbody.innerHTML = `<tr><td colspan="4" class="text-center text-danger">⚠️ Error: ${error.message}</td></tr>`;
+  }
+}
+
+// Render views table
+function renderViewsTable(limit = null) {
+  const tbody = document.getElementById('views-table');
+  if (!tbody) return;
+  
+  const dataToShow = limit ? window.allViewsData.slice(0, limit) : window.allViewsData;
+  
+  if (window.allViewsData.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="4" class="text-center text-info">📭 No view data yet.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = dataToShow.map((view) => {
+    const escapeHtml = (text) => {
+      if (!text) return 'N/A';
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    };
+    
+    const visitorId = view.visitor_id || view.ip_address || 'Unknown';
+    const userAgent = view.user_agent || 'Unknown';
+    const shortUserAgent = userAgent.length > 40 ? userAgent.substring(0, 40) + '...' : userAgent;
+    const viewTime = view.viewed_at ? new Date(view.viewed_at).toLocaleString() : 'N/A';
+    const referrer = view.referrer && view.referrer !== 'direct' ? view.referrer : 'Direct';
+    const shortReferrer = referrer.length > 40 ? referrer.substring(0, 40) + '...' : referrer;
+    
+    return `
+      <tr>
+        <td>${escapeHtml(visitorId.toString().substring(0, 8) + '...')}</td>
+        <td><strong>${viewTime}</strong></td>
+        <td title="${escapeHtml(referrer)}">${escapeHtml(shortReferrer)}</td>
+        <td title="${escapeHtml(userAgent)}">${escapeHtml(shortUserAgent)}</td>
+      </tr>
+    `;
+  }).join('');
+}
+
+// Toggle views view
+function toggleViewsView() {
+  window.viewsExpanded = !window.viewsExpanded;
+  const btn = document.getElementById('views-view-more-btn');
+  
+  if (btn) {
+    if (window.viewsExpanded) {
+      renderViewsTable();
+      btn.innerHTML = '<i class="bi bi-chevron-up"></i> View Less';
+    } else {
+      renderViewsTable(10);
+      btn.innerHTML = '<i class="bi bi-chevron-down"></i> View More';
+    }
+  }
+}
+
+// Load messages
+async function loadMessages() {
+  const tbody = document.getElementById('messages-table');
+  const supabase = getSupabaseClient();
+  
+  if (!tbody || !supabase) {
+    return;
+  }
+
+  try {
+    const { data: messagesData, error: messagesError } = await supabase
+      .from('messages')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (messagesError) {
+      throw messagesError;
+    }
+
+    window.allMessagesData = messagesData || [];
+    window.messagesData = messagesData || [];
+
+    if (!messagesData || messagesData.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="8" class="text-center text-info">📭 No messages yet.</td></tr>';
+      const btn = document.getElementById('messages-view-more-btn');
+      if (btn) btn.style.display = 'none';
+    } else {
+      renderMessagesTable(10);
+      const btn = document.getElementById('messages-view-more-btn');
+      if (btn && messagesData.length > 10) {
+        btn.style.display = 'block';
+      }
+    }
+  } catch (error) {
+    console.error('Error loading messages:', error);
+    tbody.innerHTML = `<tr><td colspan="8" class="text-center text-danger">⚠️ Error: ${error.message}</td></tr>`;
+  }
+}
+
+// Render messages table
+function renderMessagesTable(limit = null) {
+  const tbody = document.getElementById('messages-table');
+  if (!tbody) return;
+  
+  if (!window.allMessagesData || window.allMessagesData.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="8" class="text-center text-info">📭 No messages yet.</td></tr>';
+    return;
+  }
+
+  const dataToShow = limit ? window.allMessagesData.slice(0, limit) : window.allMessagesData;
+  
+  tbody.innerHTML = dataToShow.map((msg) => {
+    const escapeHtml = (text) => {
+      if (!text) return '';
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    };
+    
+    const messagePreview = msg.message ? (msg.message.length > 50 ? msg.message.substring(0, 50) + '...' : msg.message) : 'No message';
+    const safeMessage = escapeHtml(msg.message || '');
+    const safeName = escapeHtml(msg.name || '');
+    const safeEmail = escapeHtml(msg.email || '');
+    const safeSubject = escapeHtml(msg.subject || 'No Subject');
+    
+    return `
+      <tr class="${msg.read_status ? '' : 'table-warning'}" data-message-id="${msg.id}">
+        <td>${msg.id}</td>
+        <td>${safeName}</td>
+        <td><a href="mailto:${safeEmail}">${safeEmail}</a></td>
+        <td>${safeSubject}</td>
+        <td>
+          <button class="btn btn-sm btn-outline-light" onclick="showMessageModal(${msg.id})" title="Click to view full message">
+            ${escapeHtml(messagePreview)}
+          </button>
+        </td>
+        <td>${new Date(msg.created_at).toLocaleString()}</td>
+        <td>
+          <span class="badge ${msg.read_status ? 'bg-success' : 'bg-warning'}">
+            ${msg.read_status ? 'Read' : 'Unread'}
+          </span>
+        </td>
+        <td>
+          ${!msg.read_status ? `
+            <button class="btn btn-sm btn-success" onclick="markAsRead(${msg.id})" title="Mark as Read">
+              <i class="bi bi-check-circle"></i>
+            </button>
+          ` : ''}
+          <button class="btn btn-sm btn-danger" onclick="deleteMessage(${msg.id})" title="Delete">
+            <i class="bi bi-trash"></i>
+          </button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+// Toggle messages view
+function toggleMessagesView() {
+  window.messagesExpanded = !window.messagesExpanded;
+  const btn = document.getElementById('messages-view-more-btn');
+  
+  if (btn) {
+    if (window.messagesExpanded) {
+      renderMessagesTable();
+      btn.innerHTML = '<i class="bi bi-chevron-up"></i> View Less';
+    } else {
+      renderMessagesTable(10);
+      btn.innerHTML = '<i class="bi bi-chevron-down"></i> View More';
+    }
+  }
+}
+
+// Show message modal
+function showMessageModal(messageId) {
+  const message = window.messagesData?.find(msg => msg.id === messageId);
+  if (!message) {
+    alert('Message not found');
+    return;
+  }
+
+  // Create modal if it doesn't exist
+  let modal = document.getElementById('messageModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'messageModal';
+    modal.className = 'modal fade';
+    modal.innerHTML = `
+      <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content" style="background-color: #232323; color: #ffffff;">
+          <div class="modal-header" style="border-bottom: 1px solid rgba(255,255,255,0.1);">
+            <h5 class="modal-title">Message Details</h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <div class="mb-3">
+              <strong>From:</strong> <span id="modal-name"></span><br>
+              <strong>Email:</strong> <a id="modal-email" href=""></a><br>
+              <strong>Subject:</strong> <span id="modal-subject"></span><br>
+              <strong>Date:</strong> <span id="modal-date"></span>
+            </div>
+            <div class="mb-3">
+              <strong>Message:</strong>
+              <div class="mt-2 p-3" style="background-color: #1f1f1f; border-radius: 5px; white-space: pre-wrap; max-height: 400px; overflow-y: auto;" id="modal-message"></div>
+            </div>
+          </div>
+          <div class="modal-footer" style="border-top: 1px solid rgba(255,255,255,0.1);">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            <button type="button" class="btn btn-success" id="modal-mark-read-btn" style="display: none;">Mark as Read</button>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+  }
+
+  // Populate modal
+  document.getElementById('modal-name').textContent = message.name || 'Unknown';
+  document.getElementById('modal-email').textContent = message.email || '';
+  document.getElementById('modal-email').href = 'mailto:' + (message.email || '');
+  document.getElementById('modal-subject').textContent = message.subject || 'No Subject';
+  document.getElementById('modal-date').textContent = new Date(message.created_at).toLocaleString();
+  document.getElementById('modal-message').textContent = message.message || 'No message content';
+  
+  // Show/hide mark as read button
+  const markReadBtn = document.getElementById('modal-mark-read-btn');
+  if (markReadBtn) {
+    if (message.read_status) {
+      markReadBtn.style.display = 'none';
+    } else {
+      markReadBtn.style.display = 'inline-block';
+      markReadBtn.onclick = () => {
+        markAsRead(messageId);
+        const bsModal = bootstrap.Modal.getInstance(modal);
+        if (bsModal) bsModal.hide();
+      };
+    }
+  }
+
+  // Show modal
+  const bsModal = new bootstrap.Modal(modal);
+  bsModal.show();
+}
+
+// Mark message as read
+async function markAsRead(messageId) {
+  const supabase = getSupabaseClient();
+  if (!supabase) {
+    alert('Supabase client not initialized');
+    return;
+  }
+
+  try {
+    const { error } = await supabase
+      .from('messages')
+      .update({ read_status: true })
+      .eq('id', messageId);
+
+    if (error) {
+      throw error;
+    }
+
+    // Reload messages
+    const currentLimit = window.messagesExpanded ? null : 10;
+    renderMessagesTable(currentLimit);
+    await loadMessages();
+  } catch (error) {
+    console.error('Error marking message as read:', error);
+    alert('Error marking message as read: ' + error.message);
+  }
+}
+
+// Delete message
+async function deleteMessage(messageId) {
+  if (!confirm('Are you sure you want to delete this message?')) {
+    return;
+  }
+
+  const supabase = getSupabaseClient();
+  if (!supabase) {
+    alert('Supabase client not initialized');
+    return;
+  }
+
+  try {
+    const { error } = await supabase
+      .from('messages')
+      .delete()
+      .eq('id', messageId);
+
+    if (error) {
+      throw error;
+    }
+
+    // Reload messages
+    const currentLimit = window.messagesExpanded ? null : 10;
+    renderMessagesTable(currentLimit);
+    await loadMessages();
+    await loadAnalytics(); // Reload stats
+  } catch (error) {
+    console.error('Error deleting message:', error);
+    alert('Error deleting message: ' + error.message);
+  }
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+  // Setup login form
+  setupLoginForm();
+  
+  // Check authentication
+  checkAuthentication();
+  
+  // Auto-logout after 2 hours of inactivity
+  const loginTime = sessionStorage.getItem('adminLoginTime');
+  if (loginTime) {
+    const twoHours = 2 * 60 * 60 * 1000;
+    const timeSinceLogin = Date.now() - parseInt(loginTime);
+    if (timeSinceLogin > twoHours) {
+      sessionStorage.removeItem('adminAuthenticated');
+      sessionStorage.removeItem('adminLoginTime');
+      showLogin();
+    }
+  }
+  
+  // Auto-refresh every 30 seconds (only if authenticated)
+  setInterval(() => {
+    if (sessionStorage.getItem('adminAuthenticated') === 'true') {
+      loadAnalytics();
+    }
+  }, 30000);
+});
+

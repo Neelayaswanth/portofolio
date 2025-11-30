@@ -477,6 +477,12 @@ document.addEventListener('DOMContentLoaded', function() {
               sentMessage.style.display = 'none';
             }, 5000);
           }
+          
+          // Show toast notification
+          if (typeof window.showToast === 'function') {
+            window.showToast('Sent', 'success', 3000);
+          }
+          
           form.reset();
         } else {
           // Show error
@@ -486,6 +492,11 @@ document.addEventListener('DOMContentLoaded', function() {
           }
           if (sentMessage) {
             sentMessage.style.display = 'none';
+          }
+          
+          // Show error toast
+          if (typeof window.showToast === 'function') {
+            window.showToast(result?.message || 'Failed to send message', 'error', 4000);
           }
         }
       } catch (error) {
@@ -504,6 +515,11 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         if (sentMessage) {
           sentMessage.style.display = 'none';
+        }
+        
+        // Show error toast
+        if (typeof window.showToast === 'function') {
+          window.showToast(error.message || 'Network error. Please try again.', 'error', 4000);
         }
       }
     };

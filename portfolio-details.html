@@ -151,53 +151,10 @@
 
               <div class="features mt-4">
                 <h3>Key Features</h3>
-                <div class="row gy-3">
-                  <div class="col-md-6">
-                    <div class="feature-item" data-aos="fade-up" data-aos-delay="400">
-                      <i class="bi bi-shield-check"></i>
-                      <h4>Role-Based Access Control (RBAC)</h4>
-                      <p>Secure authentication and authorization system with different access levels for administrators, voters, and organizers. Ensures only authorized users can perform specific actions.</p>
-                    </div>
-                  </div>
-
-                  <div class="col-md-6">
-                    <div class="feature-item" data-aos="fade-up" data-aos-delay="500">
-                      <i class="bi bi-phone"></i>
-                      <h4>Responsive Design</h4>
-                      <p>Fully responsive interface built with Tailwind CSS, providing seamless user experience across desktop, tablet, and mobile devices. Modern UI/UX design principles implemented.</p>
-                    </div>
-                  </div>
-
-                  <div class="col-md-6">
-                    <div class="feature-item" data-aos="fade-up" data-aos-delay="600">
-                      <i class="bi bi-graph-up"></i>
-                      <h4>Real-time Vote Tracking</h4>
-                      <p>Live vote counting and result visualization. Administrators can monitor election progress in real-time with interactive charts and statistics.</p>
-                    </div>
-                  </div>
-
-                  <div class="col-md-6">
-                    <div class="feature-item" data-aos="fade-up" data-aos-delay="700">
-                      <i class="bi bi-gear"></i>
-                      <h4>Election Management</h4>
-                      <p>Comprehensive election creation and management system. Organizers can create polls, set voting periods, manage candidates, and configure voting rules.</p>
-                    </div>
-                  </div>
-
-                  <div class="col-md-6">
-                    <div class="feature-item" data-aos="fade-up" data-aos-delay="800">
-                      <i class="bi bi-lock"></i>
-                      <h4>Secure Voting</h4>
-                      <p>One-vote-per-user enforcement, encrypted vote storage, and audit trails. Ensures vote integrity and prevents fraudulent activities.</p>
-                    </div>
-                  </div>
-
-                  <div class="col-md-6">
-                    <div class="feature-item" data-aos="fade-up" data-aos-delay="900">
-                      <i class="bi bi-code-slash"></i>
-                      <h4>Modern Tech Stack</h4>
-                      <p>Built with React, TypeScript, Tailwind CSS, and Node.js. Type-safe development with TypeScript ensures code reliability and maintainability.</p>
-                    </div>
+                <!-- Features Bento Grid -->
+                <div class="features-bento-grid" data-aos="fade-up" data-aos-delay="400">
+                  <div class="bento-grid">
+                    <!-- Features will be dynamically inserted here -->
                   </div>
                 </div>
               </div>
@@ -430,15 +387,28 @@
       if (descriptionSection) {
         const overviewHTML = project.overview.map(p => `<p>${p}</p>`).join('');
         
-        const featuresHTML = project.features.map((feature, index) => `
-          <div class="col-md-6">
-            <div class="feature-item" data-aos="fade-up" data-aos-delay="${400 + (index * 100)}">
-              <i class="bi ${feature.icon}"></i>
-              <h4>${feature.title}</h4>
-              <p>${feature.description}</p>
+        // Generate features in bento grid format
+        const featuresHTML = project.features.map((feature, index) => {
+          // Determine bento size based on index for visual variety
+          let bentoSize = 'bento-small';
+          if (index === 0) {
+            bentoSize = 'bento-large'; // First feature gets large card
+          } else if (index === 1 || index === 2) {
+            bentoSize = 'bento-medium'; // Next two get medium cards
+          }
+          
+          return `
+            <div class="bento-item ${bentoSize}" data-aos="fade-up" data-aos-delay="${400 + (index * 100)}">
+              <div class="feature-card-bento">
+                <div class="feature-icon-bento">
+                  <i class="bi ${feature.icon}"></i>
+                </div>
+                <h4>${feature.title}</h4>
+                <p>${feature.description}</p>
+              </div>
             </div>
-          </div>
-        `).join('');
+          `;
+        }).join('');
 
         const technologiesHTML = project.technologies.map(tech => 
           `<span class="badge bg-primary me-2 mb-2">${tech}</span>`
@@ -449,8 +419,10 @@
           ${overviewHTML}
           <div class="features mt-4">
             <h3>Key Features</h3>
-            <div class="row gy-3">
-              ${featuresHTML}
+            <div class="features-bento-grid" data-aos="fade-up" data-aos-delay="400">
+              <div class="bento-grid">
+                ${featuresHTML}
+              </div>
             </div>
           </div>
           <div class="technologies mt-4">

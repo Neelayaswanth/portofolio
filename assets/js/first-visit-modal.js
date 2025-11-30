@@ -101,22 +101,62 @@
       timestamp: new Date().toISOString()
     }));
 
-    // Hide modal
+    // Hide modal and ensure complete cleanup
     const modalEl = document.getElementById('firstVisitModal');
     if (modalEl) {
       try {
         const modal = window.bootstrap?.Modal?.getInstance(modalEl) || bootstrap?.Modal?.getInstance(modalEl);
         if (modal) {
+          // Use Bootstrap's hide method
           modal.hide();
+          
+          // Ensure cleanup after modal hides
+          modalEl.addEventListener('hidden.bs.modal', function cleanup() {
+            // Remove all backdrops
+            const backdrops = document.querySelectorAll('.modal-backdrop');
+            backdrops.forEach(b => b.remove());
+            
+            // Remove modal-open class
+            document.body.classList.remove('modal-open');
+            
+            // Restore body overflow
+            document.body.style.overflow = '';
+            document.body.style.paddingRight = '';
+            
+            // Remove this event listener
+            modalEl.removeEventListener('hidden.bs.modal', cleanup);
+          }, { once: true });
         } else {
+          // Manual cleanup if Bootstrap modal instance doesn't exist
           modalEl.classList.remove('show');
           modalEl.style.display = 'none';
+          modalEl.setAttribute('aria-hidden', 'true');
+          modalEl.removeAttribute('aria-modal');
+          
+          // Remove all backdrops
+          const backdrops = document.querySelectorAll('.modal-backdrop');
+          backdrops.forEach(b => b.remove());
+          
+          // Remove modal-open class
           document.body.classList.remove('modal-open');
-          const backdrop = document.querySelector('.modal-backdrop');
-          if (backdrop) backdrop.remove();
+          
+          // Restore body overflow and padding
           document.body.style.overflow = '';
+          document.body.style.paddingRight = '';
         }
-      } catch (e) {}
+      } catch (e) {
+        console.error('Error hiding modal:', e);
+        // Force cleanup on error
+        const backdrops = document.querySelectorAll('.modal-backdrop');
+        backdrops.forEach(b => b.remove());
+        document.body.classList.remove('modal-open');
+        document.body.style.overflow = '';
+        document.body.style.paddingRight = '';
+        if (modalEl) {
+          modalEl.classList.remove('show');
+          modalEl.style.display = 'none';
+        }
+      }
     }
 
     // Save to database

@@ -1054,22 +1054,32 @@ function renderActualMessagesTable(limit = null) {
       return div.innerHTML;
     };
     
-    const messagePreview = message.message ? (message.message.length > 50 ? message.message.substring(0, 50) + '...' : message.message) : 'N/A';
+    const messagePreview = message.message ? (message.message.length > 100 ? message.message.substring(0, 100) + '...' : message.message) : 'N/A';
     const date = message.created_at ? new Date(message.created_at).toLocaleString() : 'N/A';
-    const isRead = message.read || false;
+    const isRead = message.read_status !== undefined ? message.read_status : (message.read || false);
+    const fullMessage = escapeHtml(message.message || '');
     
     return `
-      <tr>
+      <tr class="${isRead ? '' : 'table-warning'}">
         <td>${message.id || 'N/A'}</td>
         <td>${escapeHtml(message.name || 'Anonymous')}</td>
-        <td>${escapeHtml(message.email || 'N/A')}</td>
+        <td><a href="mailto:${escapeHtml(message.email || '')}">${escapeHtml(message.email || 'N/A')}</a></td>
         <td>${escapeHtml(message.subject || 'No Subject')}</td>
-        <td title="${escapeHtml(message.message || '')}">${escapeHtml(messagePreview)}</td>
+        <td>
+          <button class="btn btn-sm btn-link text-start p-0" onclick="showActualMessageModal(${message.id})" title="Click to view full message" style="color: var(--admin-primary); text-decoration: underline;">
+            ${escapeHtml(messagePreview)}
+          </button>
+        </td>
         <td>${date}</td>
         <td><span class="badge ${isRead ? 'bg-success' : 'bg-warning'}">${isRead ? 'Read' : 'Unread'}</span></td>
         <td>
-          <button class="btn btn-sm btn-outline-light" onclick="markMessageRead(${message.id})">
-            <i class="bi bi-check"></i>
+          ${!isRead ? `
+            <button class="btn btn-sm btn-success me-1" onclick="markMessageRead(${message.id})" title="Mark as Read">
+              <i class="bi bi-check-circle"></i>
+            </button>
+          ` : ''}
+          <button class="btn btn-sm btn-danger" onclick="deleteActualMessage(${message.id})" title="Delete">
+            <i class="bi bi-trash"></i>
           </button>
         </td>
       </tr>
@@ -1090,6 +1100,177 @@ function toggleActualMessagesView() {
       renderActualMessagesTable(10);
       btn.innerHTML = '<i class="bi bi-chevron-down"></i> View More';
     }
+  }
+}
+
+// Show message modal for actual messages
+function showActualMessageModal(messageId) {
+  const message = window.allActualMessages?.find(msg => msg.id === messageId);
+  if (!message) {
+    alert('Message not found');
+    return;
+  }
+
+  // Create modal if it doesn't exist
+  let modal = document.getElementById('actualMessageModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'actualMessageModal';
+    modal.className = 'modal fade';
+    modal.innerHTML = `
+      <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content" style="background-color: #232323; color: #ffffff; border: 1px solid rgba(255,255,255,0.1);">
+          <div class="modal-header" style="border-bottom: 1px solid rgba(255,255,255,0.1);">
+            <h5 class="modal-title"><i class="bi bi-envelope"></i> Message Details</h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div class="mb-4">
+              <div class="mb-2"><strong>From:</strong> <span id="actual-modal-name"></span></div>
+              <div class="mb-2"><strong>Email:</strong> <a id="actual-modal-email" href="" style="color: var(--admin-primary);"></a></div>
+              <div class="mb-2"><strong>Subject:</strong> <span id="actual-modal-subject"></span></div>
+              <div class="mb-2"><strong>Date:</strong> <span id="actual-modal-date"></span></div>
+              <div class="mb-2"><strong>Status:</strong> <span id="actual-modal-status"></span></div>
+            </div>
+            <div>
+              <strong>Message:</strong>
+              <div class="mt-2 p-3" style="background-color: #1f1f1f; border-radius: 8px; white-space: pre-wrap; max-height: 500px; overflow-y: auto; border: 1px solid rgba(255,255,255,0.1);" id="actual-modal-message"></div>
+            </div>
+          </div>
+          <div class="modal-footer" style="border-top: 1px solid rgba(255,255,255,0.1);">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            <button type="button" class="btn btn-success" id="actual-modal-mark-read-btn" style="display: none;">
+              <i class="bi bi-check-circle"></i> Mark as Read
+            </button>
+            <button type="button" class="btn btn-danger" id="actual-modal-delete-btn">
+              <i class="bi bi-trash"></i> Delete
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+  }
+
+  // Populate modal
+  const isRead = message.read_status !== undefined ? message.read_status : (message.read || false);
+  document.getElementById('actual-modal-name').textContent = message.name || 'Unknown';
+  const emailEl = document.getElementById('actual-modal-email');
+  emailEl.textContent = message.email || 'N/A';
+  emailEl.href = message.email ? 'mailto:' + message.email : '#';
+  document.getElementById('actual-modal-subject').textContent = message.subject || 'No Subject';
+  document.getElementById('actual-modal-date').textContent = message.created_at ? new Date(message.created_at).toLocaleString() : 'N/A';
+  document.getElementById('actual-modal-status').innerHTML = `<span class="badge ${isRead ? 'bg-success' : 'bg-warning'}">${isRead ? 'Read' : 'Unread'}</span>`;
+  document.getElementById('actual-modal-message').textContent = message.message || 'No message content';
+  
+  // Set up mark as read button
+  const markReadBtn = document.getElementById('actual-modal-mark-read-btn');
+  if (markReadBtn) {
+    if (isRead) {
+      markReadBtn.style.display = 'none';
+    } else {
+      markReadBtn.style.display = 'inline-block';
+      markReadBtn.onclick = () => {
+        markMessageRead(messageId);
+      };
+    }
+  }
+
+  // Set up delete button
+  const deleteBtn = document.getElementById('actual-modal-delete-btn');
+  if (deleteBtn) {
+    deleteBtn.onclick = () => {
+      if (confirm('Are you sure you want to delete this message?')) {
+        deleteActualMessage(messageId);
+        const bsModal = bootstrap.Modal.getInstance(modal);
+        if (bsModal) bsModal.hide();
+      }
+    };
+  }
+
+  // Show modal
+  const bsModal = new bootstrap.Modal(modal);
+  bsModal.show();
+}
+
+// Mark message as read (for actual messages)
+async function markMessageRead(messageId) {
+  const supabase = getSupabaseClient();
+  if (!supabase) {
+    alert('Database connection error');
+    return;
+  }
+
+  try {
+    const { error } = await supabase
+      .from('messages')
+      .update({ read_status: true })
+      .eq('id', messageId);
+
+    if (error) {
+      throw error;
+    }
+
+    // Update local data
+    if (window.allActualMessages) {
+      const message = window.allActualMessages.find(msg => msg.id === messageId);
+      if (message) {
+        message.read_status = true;
+      }
+    }
+
+    // Reload messages table
+    const currentLimit = window.actualMessagesExpanded ? null : 10;
+    renderActualMessagesTable(currentLimit);
+    
+    // Reload analytics to update count
+    await loadAnalytics();
+
+    console.log('✅ Message marked as read');
+  } catch (error) {
+    console.error('❌ Error marking message as read:', error);
+    alert('Error marking message as read: ' + error.message);
+  }
+}
+
+// Delete actual message
+async function deleteActualMessage(messageId) {
+  if (!confirm('Are you sure you want to delete this message? This action cannot be undone.')) {
+    return;
+  }
+
+  const supabase = getSupabaseClient();
+  if (!supabase) {
+    alert('Database connection error');
+    return;
+  }
+
+  try {
+    const { error } = await supabase
+      .from('messages')
+      .delete()
+      .eq('id', messageId);
+
+    if (error) {
+      throw error;
+    }
+
+    // Remove from local data
+    if (window.allActualMessages) {
+      window.allActualMessages = window.allActualMessages.filter(msg => msg.id !== messageId);
+    }
+
+    // Reload messages table
+    const currentLimit = window.actualMessagesExpanded ? null : 10;
+    renderActualMessagesTable(currentLimit);
+    
+    // Reload analytics to update count
+    await loadAnalytics();
+
+    console.log('✅ Message deleted');
+  } catch (error) {
+    console.error('❌ Error deleting message:', error);
+    alert('Error deleting message: ' + error.message);
   }
 }
 

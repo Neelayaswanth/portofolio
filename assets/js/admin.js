@@ -1723,7 +1723,7 @@ async function loadOnlineUsers() {
       .select('ip_address, viewed_at, referrer, user_agent, session_id')
       .gte('viewed_at', fiveMinutesAgo)
       .order('viewed_at', { ascending: false })
-      .limit(500); // Get up to 500 recent views
+      .limit(1000); // Get up to 1000 recent views to capture all online users
 
     if (viewsError) {
       console.error('❌ Error loading profile views:', viewsError);

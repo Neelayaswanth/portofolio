@@ -620,18 +620,6 @@
             console.log('✅ Animation overlay removed');
           }
           showPortfolioContent();
-          
-          // Trigger first visit modal IMMEDIATELY after overlay is removed
-          setTimeout(() => {
-            console.log('🎬 Animation complete! Showing first visit modal...');
-            if (typeof window.showFirstVisitModal === 'function') {
-              window.showFirstVisitModal();
-            } else if (typeof window.triggerFirstVisitModal === 'function') {
-              window.triggerFirstVisitModal();
-            } else {
-              console.error('❌ Modal functions not available!');
-            }
-          }, 500);
         }, 1000);
       }
     }, 4000);

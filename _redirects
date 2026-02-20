@@ -1,0 +1,9 @@
+# Netlify redirects file
+# Clean URLs for projects
+/projects/voting-system    /portfolio-details.html?project=voting-system    200
+/projects/dry-eye          /portfolio-details.html?project=dry-eye          200
+/projects/certichain       /portfolio-details.html?project=certichain       200
+/projects/aura-music       /portfolio-details.html?project=aura-music       200
+
+# Fallback to 404
+/*    /404.html    404

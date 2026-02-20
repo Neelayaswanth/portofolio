@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta content="width=device-width, initial-scale=1.0" name="viewport">
+  <title>Page Not Found - Neela Yaswanth</title>
+  <meta name="description" content="Page not found - Neela Yaswanth Portfolio">
+
+  <!-- Favicons -->
+  <link rel="icon" type="image/x-icon" href="assets/img/favicon.png?v=2">
+  <link rel="icon" type="image/svg+xml" href="assets/img/favicon.svg?v=2">
+
+  <!-- Fonts -->
+  <link href="https://fonts.googleapis.com" rel="preconnect">
+  <link href="https://fonts.gstatic.com" rel="preconnect" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Ubuntu:wght@300;400;500;700&family=Nunito:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Vendor CSS Files -->
+  <link href="assets/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+  <link href="assets/vendor/bootstrap-icons/bootstrap-icons.css" rel="stylesheet">
+  <link href="assets/vendor/aos/aos.css" rel="stylesheet">
+
+  <!-- Main CSS File -->
+  <link href="assets/css/main.css" rel="stylesheet">
+
+  <style>
+    .error-page {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      color: #fff;
+      text-align: center;
+      padding: 20px;
+    }
+    .error-content {
+      max-width: 600px;
+    }
+    .error-code {
+      font-size: 120px;
+      font-weight: 700;
+      background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      line-height: 1;
+      margin-bottom: 20px;
+    }
+    .error-title {
+      font-size: 32px;
+      font-weight: 600;
+      margin-bottom: 15px;
+    }
+    .error-message {
+      font-size: 18px;
+      color: #94a3b8;
+      margin-bottom: 30px;
+    }
+    .error-actions {
+      display: flex;
+      gap: 15px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    .btn-home {
+      background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+      color: #fff;
+      padding: 12px 30px;
+      border-radius: 8px;
+      text-decoration: none;
+      font-weight: 500;
+      transition: transform 0.3s, box-shadow 0.3s;
+    }
+    .btn-home:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 30px rgba(99, 102, 241, 0.4);
+      color: #fff;
+    }
+    .btn-portfolio {
+      background: transparent;
+      border: 2px solid #6366f1;
+      color: #6366f1;
+      padding: 12px 30px;
+      border-radius: 8px;
+      text-decoration: none;
+      font-weight: 500;
+      transition: all 0.3s;
+    }
+    .btn-portfolio:hover {
+      background: #6366f1;
+      color: #fff;
+    }
+    .suggested-links {
+      margin-top: 50px;
+      padding-top: 30px;
+      border-top: 1px solid rgba(255,255,255,0.1);
+    }
+    .suggested-links h4 {
+      font-size: 16px;
+      color: #94a3b8;
+      margin-bottom: 20px;
+    }
+    .suggested-links ul {
+      list-style: none;
+      padding: 0;
+      display: flex;
+      gap: 20px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    .suggested-links a {
+      color: #6366f1;
+      text-decoration: none;
+      transition: color 0.3s;
+    }
+    .suggested-links a:hover {
+      color: #a855f7;
+    }
+  </style>
+
+  <script>
+    (function() {
+      var path = window.location.pathname;
+      
+      var projectRoutes = {
+        '/projects/voting-system': 'portfolio-details.html?project=voting-system',
+        '/projects/dry-eye': 'portfolio-details.html?project=dry-eye',
+        '/projects/certichain': 'portfolio-details.html?project=certichain',
+        '/projects/aura-music': 'portfolio-details.html?project=aura-music'
+      };
+
+      for (var route in projectRoutes) {
+        if (path === route || path === route + '/' || path.endsWith(route) || path.endsWith(route + '/')) {
+          window.location.replace(projectRoutes[route]);
+          return;
+        }
+      }
+    })();
+  </script>
+</head>
+
+<body class="error-page-body">
+
+  <!-- Custom Cursor -->
+  <div class="custom-cursor" id="customCursor"></div>
+  <div class="custom-cursor-follower" id="customCursorFollower"></div>
+
+  <div class="error-page">
+    <div class="error-content" data-aos="fade-up">
+      <div class="error-code">404</div>
+      <h1 class="error-title">Page Not Found</h1>
+      <p class="error-message">
+        Oops! The page you're looking for doesn't exist or has been moved.
+        Don't worry, let's get you back on track.
+      </p>
+      <div class="error-actions">
+        <a href="index.html" class="btn-home">
+          <i class="bi bi-house me-2"></i>Back to Home
+        </a>
+        <a href="index.html#portfolio" class="btn-portfolio">
+          <i class="bi bi-images me-2"></i>View Portfolio
+        </a>
+      </div>
+      
+      <div class="suggested-links">
+        <h4>Or check out these pages:</h4>
+        <ul>
+          <li><a href="index.html#about"><i class="bi bi-person me-1"></i>About</a></li>
+          <li><a href="index.html#resume"><i class="bi bi-file-earmark-text me-1"></i>Resume</a></li>
+          <li><a href="index.html#services"><i class="bi bi-hdd-stack me-1"></i>Services</a></li>
+          <li><a href="index.html#contact"><i class="bi bi-envelope me-1"></i>Contact</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- Vendor JS Files -->
+  <script src="assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+  <script src="assets/vendor/aos/aos.js"></script>
+  
+  <!-- Main JS File -->
+  <script src="assets/js/main.js"></script>
+  
+  <!-- Custom Cursor -->
+  <script src="assets/js/cursor.js"></script>
+
+</body>
+
+</html>
